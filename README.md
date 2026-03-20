@@ -1,58 +1,134 @@
 # RankIT
 
-RankIT is a role-based tabulation system with separate experiences for:
+RankIT is a role-based event tabulation platform built with React, Express, and MongoDB. It supports secure scoring workflows for staff and a public Community View for live audience tracking.
 
-- `superadmin`
-- `admin`
-- `tallier`
-- `tabulator`
+## Highlights
 
-## Project Structure
+- Role-based access for superadmin, admin, tabulator, and tallier
+- Public Community leaderboard at /
+- Live ranking updates via polling
+- Gatekeeper logic for unlocking final rankings
+- Event and contestant management
+- Audit trail and analytics dashboards
+- Vercel-ready frontend deployment setup
 
-- `backend/` - Express + MongoDB API
-- `frontend-react/` - React client
-- `package.json` (root) - workspace scripts for running both services
+## Project Architecture
 
-## Scripts
+- frontend-react: React client (Create React App)
+- backend: Express API with MongoDB
+- root workspace: convenience scripts for local development and production-style runs
 
-From the project root:
+## Main Features
 
-- `npm run dev` - Runs backend + frontend in development mode
-- `npm run prod` - Builds frontend, then runs backend in production mode (backend serves frontend build)
+### Public Community View
 
-## Default URLs
+- Public route at /
+- No login required for audience access
+- Top-3 podium with medal crown visuals
+- Category and event filtering
+- Live status badge (LIVE or FINAL)
+- Real-time feel via periodic refresh
 
-- Development frontend: `http://localhost:3000`
-- Backend API: `http://localhost:5000/api`
-- Production app URL: `http://localhost:5000` (or `PORT` from backend `.env`)
+### Staff Modules
 
-## Environment Variables
+- Tallier: submit scores per contestant and criteria
+- Tabulator: view progress and rankings
+- Admin: create events and manage contestants/users
+- Superadmin: approval flow, analytics, audits, and system oversight
 
-Backend (`backend/.env`):
+### Security and Governance
 
-- `PORT=5000`
-- `MONGODB_URI=mongodb://localhost:27017/RankIT_DB`
-- `JWT_SECRET=change-this-secret`
-- `JWT_EXPIRES_IN=12h`
+- JWT authentication
+- Role authorization middleware
+- Approval workflows for user onboarding
+- Server-side restrictions for privileged role creation
 
-Frontend (`frontend-react/.env`):
+## Quick Start
 
-- `REACT_APP_API_URL=http://localhost:5000/api`
+### 1. Install Dependencies
 
-## Seed Users
-
-Run from `backend/`:
+From root:
 
 ```bash
-npm run seed:users
+npm run install:all
 ```
 
-Default seeded credentials (password for all): `1234`
+### 2. Configure Environment Files
 
-- `superadmin1`
-- `admin1`
-- `tabulator1`
-- `tallier1`
-- `pending1`
+Backend file: backend/.env
 
-See setup details in `SETUP.md`, backend details in `BACKEND_README.md`, frontend details in `FRONTEND_README.md`, and Vercel deployment in `VERCEL_SETUP.md`.
+```env
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/RankIT_DB
+JWT_SECRET=change-this-secret
+JWT_EXPIRES_IN=12h
+```
+
+Frontend file: frontend-react/.env
+
+```env
+REACT_APP_API_URL=http://localhost:5000/api
+```
+
+### 3. Seed Initial Users (Optional)
+
+```bash
+npm run seed:users --prefix backend
+```
+
+Default password: 1234
+
+- superadmin1
+- admin1
+- tabulator1
+- tallier1
+- pending1
+
+### 4. Run in Development
+
+```bash
+npm run dev
+```
+
+Expected endpoints:
+
+- Frontend: http://localhost:3000
+- API: http://localhost:5000/api
+
+## Root Scripts
+
+- npm run install:all: install root, backend, and frontend dependencies
+- npm run dev: run backend and frontend concurrently
+- npm run prod: build frontend and run backend in production mode
+
+## Deployment
+
+Recommended deployment strategy:
+
+- Frontend on Vercel
+- Backend on a Node host (Render, Railway, Fly.io, etc.)
+
+See deployment details in VERCEL_SETUP.md.
+
+## Troubleshooting
+
+### npm run dev fails under concurrently
+
+If you see errors such as nodemon not recognized or react-scripts not recognized, dependencies are missing in one or both app folders.
+
+Fix:
+
+```bash
+npm run install:all
+```
+
+### webpack-dev-server client path error on Windows paths
+
+The frontend includes a postinstall patch script to handle path issues with webpack-dev-server. If dependencies were removed and reinstalled, rerun install to ensure patch application.
+
+## Documentation Map
+
+- SETUP.md: local setup guide
+- BACKEND_README.md: backend-specific guide
+- FRONTEND_README.md: frontend-specific guide
+- VERCEL_SETUP.md: deployment guide
