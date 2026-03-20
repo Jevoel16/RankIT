@@ -1,0 +1,18 @@
+# Exclude backend when deploying frontend on Vercel
+backend/
+
+# Local/dependency/build artifacts
+node_modules/
+frontend-react/node_modules/
+frontend-react/build/
+
+# Local env files
+.env
+frontend-react/.env
+frontend-react/.env.*
+backend/.env
+
+# Documentation and local config (not needed by runtime deployment bundle)
+*.md
+.vscode/
+.idea/
