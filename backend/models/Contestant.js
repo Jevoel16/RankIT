@@ -15,7 +15,30 @@ const contestantSchema = new mongoose.Schema(
     contestantNumber: {
       type: Number,
       min: [1, 'Contestant number must be at least 1']
-    }
+    },
+    grievances: [
+      {
+        reason: {
+          type: String,
+          required: [true, 'Grievance reason is required'],
+          trim: true
+        },
+        deductionPoints: {
+          type: Number,
+          required: [true, 'Deduction points are required'],
+          min: [0, 'Deduction points cannot be negative']
+        },
+        filedBy: {
+          type: String,
+          required: [true, 'FiledBy is required'],
+          trim: true
+        },
+        timestamp: {
+          type: Date,
+          default: Date.now
+        }
+      }
+    ]
   },
   {
     timestamps: true

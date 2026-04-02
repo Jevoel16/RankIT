@@ -29,6 +29,7 @@ Create `backend/.env`:
 
 ```env
 PORT=5000
+HOST=0.0.0.0
 MONGODB_URI=mongodb://localhost:27017/RankIT_DB
 JWT_SECRET=change-this-secret
 JWT_EXPIRES_IN=12h
@@ -47,6 +48,29 @@ REACT_APP_API_URL=http://localhost:5000/api
 ```bash
 npm run seed:users --prefix backend
 ```
+
+### Default Seeded Users (Domain-Based Format)
+
+After seeding, use these credentials to log in. Usernames use the format `username@role.rankit`:
+
+| Username | Password | Role | Description |
+|----------|----------|------|-------------|
+| `superadmin1@superadmin.rankit` | `1234` | Superadmin | Full system access |
+| `admin1@admin.rankit` | `1234` | Admin | Can create/manage users and events |
+| `tabulator1@tabulator.rankit` | `1234` | Tabulator | Gatekeeper; manages scoresheets & rankings |
+| `tallier1@tallier.rankit` | `1234` | Tallier | Judge/scorer; submits scores |
+| `grievance1@grievance.rankit` | `1234` | Grievance Committee | Files and reviews grievances |
+| `pending1@tallier.rankit` | `1234` | Tallier (Pending) | Requires admin approval to access |
+
+**Example Login Flow**:
+1. Open `http://localhost:3000`
+2. Click "Login" tab
+3. Enter username: `admin1@admin.rankit`
+4. Enter password: `1234`
+5. Click "Login"
+
+**For Other Devices on Network**:
+Replace `localhost` with your machine's IP address (e.g., `http://192.168.1.100:3000`)
 
 ## 5. Run in Development
 
@@ -87,6 +111,12 @@ Open:
   - Verify `MONGODB_URI` and MongoDB service
 - Frontend cannot call API:
   - Verify `REACT_APP_API_URL` in `frontend-react/.env`
+- Other device cannot fetch API:
+  - Use machine LAN IP instead of localhost for both frontend and REACT_APP_API_URL
+  - Example frontend URL: `http://192.168.1.23:3000`
+  - Example API URL: `http://192.168.1.23:5000/api`
+  - Frontend now auto-rewrites localhost API config to current hostname when accessed remotely
+  - Ensure Windows Firewall allows inbound TCP on ports 3000 and 5000
 - `npm run dev` fails under concurrently with `nodemon` or `react-scripts` not recognized:
   - App-level dependencies are missing (backend/frontend node_modules were removed or not installed)
   - Run: `npm run install:all`

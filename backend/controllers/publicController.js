@@ -79,13 +79,28 @@ const getPublicLeaderboard = async (req, res) => {
           totalScore: { $ifNull: ['$stats.totalScore', 0] },
           averageScore: { $ifNull: ['$stats.averageScore', 0] },
           submissions: { $ifNull: ['$stats.submissions', 0] },
-          latestSubmittedAt: '$stats.latestSubmittedAt'
+          latestSubmittedAt: '$stats.latestSubmittedAt',
+          deductionPoints: {
+            $sum: {
+              $map: {
+                input: { $ifNull: ['$grievances', []] },
+                as: 'entry',
+                in: { $ifNull: ['$$entry.deductionPoints', 0] }
+              }
+            }
+          }
+        }
+      },
+      {
+        $addFields: {
+          adjustedAverageScore: { $subtract: ['$averageScore', '$deductionPoints'] },
+          adjustedTotalScore: { $subtract: ['$totalScore', '$deductionPoints'] }
         }
       },
       {
         $sort: {
-          averageScore: -1,
-          totalScore: -1,
+          adjustedAverageScore: -1,
+          adjustedTotalScore: -1,
           contestantNumber: 1,
           name: 1
         }
@@ -93,7 +108,7 @@ const getPublicLeaderboard = async (req, res) => {
       {
         $setWindowFields: {
           sortBy: {
-            averageScore: -1
+            adjustedAverageScore: -1
           },
           output: {
             liveRank: {
@@ -109,8 +124,9 @@ const getPublicLeaderboard = async (req, res) => {
           contestantName: '$name',
           contestantNumber: 1,
           liveRank: 1,
-          averageScore: { $round: ['$averageScore', 2] },
-          totalScore: { $round: ['$totalScore', 2] },
+          averageScore: { $round: ['$adjustedAverageScore', 2] },
+          totalScore: { $round: ['$adjustedTotalScore', 2] },
+          deductionPoints: { $round: ['$deductionPoints', 2] },
           submissions: 1,
           latestSubmittedAt: 1
         }
@@ -118,7 +134,7 @@ const getPublicLeaderboard = async (req, res) => {
       {
         $sort: {
           liveRank: 1,
-          totalScore: -1,
+          averageScore: -1,
           contestantNumber: 1,
           contestantName: 1
         }
@@ -147,17 +163,21 @@ const getPublicLeaderboard = async (req, res) => {
       };
     }
 
-    const isLive = event.status === 'locked';
-    const winners = isLive ? [] : leaderboard.slice(0, 3);
+    // Use final results if event is finalized, otherwise use live leaderboard
+    const displayLeaderboard = event.eventStatus === 'finalized' ? event.finalResults : leaderboard;
+    const isLive = event.eventStatus !== 'finalized';
+    const winners = isLive ? [] : displayLeaderboard.slice(0, 3);
+    
     const events = (matchingEvents || []).map((item) => {
-      const isItemLive = item.status === 'locked';
+      const isFinal = item.eventStatus === 'finalized';
       return {
         eventId: item._id,
         eventName: item.name,
         category: item.category,
         status: item.status,
-        displayStatus: isItemLive ? 'In-Progress' : 'Completed',
-        badge: isItemLive ? 'LIVE' : 'FINAL'
+        eventStatus: item.eventStatus,
+        displayStatus: isFinal ? 'Finalized' : (item.status === 'locked' ? 'In-Progress' : 'Completed'),
+        badge: isFinal ? 'FINAL' : (item.status === 'locked' ? 'LIVE' : 'COMPLETED')
       };
     });
 

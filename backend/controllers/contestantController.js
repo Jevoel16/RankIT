@@ -1,5 +1,14 @@
 const Contestant = require('../models/Contestant');
 const Event = require('../models/Event');
+const Audit = require('../models/Audit');
+
+const writeAudit = async ({ action, actorId, eventId, entityType, entityId, metadata }) => {
+  try {
+    await Audit.create({ action, actorId, eventId, entityType, entityId, metadata });
+  } catch (_error) {
+    // Logging failures should not block core endpoints.
+  }
+};
 
 const getContestantsByEvent = async (req, res) => {
   try {
@@ -83,8 +92,67 @@ const bulkCreateContestants = async (req, res) => {
   }
 };
 
+const deductContestantScore = async (req, res) => {
+  try {
+    const contestant = await Contestant.findById(req.params.id);
+    if (!contestant) {
+      return res.status(404).json({ message: 'Contestant not found.' });
+    }
+
+    const event = await Event.findById(contestant.eventId);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found.' });
+    }
+
+    // Prevent grievance filing if event is finalized
+    if (event.eventStatus === 'finalized') {
+      return res.status(403).json({ message: 'Cannot file grievances: Event has been finalized.' });
+    }
+
+    const reason = String(req.body.reason || '').trim();
+    const deductionPoints = Number(req.body.deductionPoints);
+
+    if (!reason) {
+      return res.status(400).json({ message: 'reason is required.' });
+    }
+
+    if (!Number.isFinite(deductionPoints) || deductionPoints <= 0) {
+      return res.status(400).json({ message: 'deductionPoints must be a positive number.' });
+    }
+
+    const grievanceEntry = {
+      reason,
+      deductionPoints,
+      filedBy: req.user?.username || 'unknown',
+      timestamp: new Date()
+    };
+
+    contestant.grievances = Array.isArray(contestant.grievances) ? contestant.grievances : [];
+    contestant.grievances.push(grievanceEntry);
+    await contestant.save();
+
+    await writeAudit({
+      action: 'SCORE_ALTERED_BY_GRIEVANCE',
+      actorId: req.user._id,
+      eventId: contestant.eventId,
+      entityType: 'contestant',
+      entityId: contestant._id,
+      metadata: {
+        reason,
+        deductionPoints,
+        filedBy: grievanceEntry.filedBy
+      }
+    });
+
+    return res.json(contestant);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getContestantsByEvent,
   createContestant,
-  bulkCreateContestants
+  bulkCreateContestants,
+  deductContestantScore
 };

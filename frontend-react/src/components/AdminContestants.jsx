@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { bulkCreateContestants, createContestant, fetchContestants, fetchEvents } from '../api';
+import usePagination from '../hooks/usePagination';
+import TablePager from './TablePager';
 
 export default function AdminContestants({ token }) {
   const [events, setEvents] = useState([]);
@@ -11,6 +13,8 @@ export default function AdminContestants({ token }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const contestantsPagination = usePagination(contestants, 10);
 
   const loadContestants = async (selectedEventId) => {
     if (!selectedEventId) {
@@ -173,7 +177,7 @@ export default function AdminContestants({ token }) {
                 </td>
               </tr>
             )}
-            {contestants.map((item) => (
+            {contestantsPagination.paginatedItems.map((item) => (
               <tr key={item._id}>
                 <td>{item.contestantNumber || '-'}</td>
                 <td>{item.name}</td>
@@ -183,6 +187,15 @@ export default function AdminContestants({ token }) {
           </tbody>
         </table>
       </div>
+      <TablePager
+        page={contestantsPagination.page}
+        totalPages={contestantsPagination.totalPages}
+        totalItems={contestantsPagination.totalItems}
+        canPrev={contestantsPagination.canPrev}
+        canNext={contestantsPagination.canNext}
+        onPrev={contestantsPagination.goPrev}
+        onNext={contestantsPagination.goNext}
+      />
 
       {error && <p className="error">{error}</p>}
       {success && <p className="success">{success}</p>}

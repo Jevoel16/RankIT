@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { register as registerRequest } from '../api';
 
 export default function LoginPage() {
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mode, setMode] = useState('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +22,8 @@ export default function LoginPage() {
         ? '/tallier'
         : user?.role === 'tabulator'
           ? '/tabulator'
+          : user?.role === 'grievancecommittee'
+            ? '/grievance'
           : user?.role === 'superadmin'
             ? '/superadmin'
             : '/admin';
@@ -46,15 +49,23 @@ export default function LoginPage() {
         setConfirmPassword('');
       } else {
         const payload = await login(username, password);
+        const from = location.state?.from || '';
         const rolePath =
           payload.user.role === 'tallier'
             ? '/tallier'
             : payload.user.role === 'tabulator'
               ? '/tabulator'
+              : payload.user.role === 'grievancecommittee'
+                ? '/grievance'
               : payload.user.role === 'superadmin'
                 ? '/superadmin'
               : '/admin';
-        navigate(rolePath, { replace: true });
+
+        const canUseFrom =
+          (payload.user.role === 'tallier' && from.startsWith('/tally/')) ||
+          (payload.user.role === 'tabulator' && from.startsWith('/tabulate/'));
+
+        navigate(canUseFrom ? from : rolePath, { replace: true });
       }
     } catch (err) {
       setError(err.message);
@@ -93,8 +104,8 @@ export default function LoginPage() {
         </div>
         <p className="muted">
           {mode === 'register'
-            ? 'Create a tallier or tabulator account. Approval is required before login.'
-            : 'Sign in with your role account.'}
+            ? 'Create a tallier, tabulator, or grievance committee account. Approval is required before login.'
+            : 'Sign in with your role-based domain account.'}
         </p>
         <label htmlFor="username">Username</label>
         <input
@@ -103,7 +114,13 @@ export default function LoginPage() {
           onChange={(e) => setUsername(e.target.value)}
           required
           autoComplete="username"
+          placeholder={mode === 'register' ? 'your_name (will be username@role.rankit)' : 'username@role.rankit'}
         />
+        {mode === 'login' && (
+          <small style={{ color: 'rgba(255,255,255,0.6)', marginTop: '-6px', marginBottom: '8px', display: 'block' }}>
+            Format: username@role.rankit (e.g., john@tallier.rankit)
+          </small>
+        )}
         <label htmlFor="password">Password</label>
         <input
           id="password"
@@ -127,9 +144,13 @@ export default function LoginPage() {
 
             <label htmlFor="register-role">Role</label>
             <select id="register-role" value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="tallier">Tallier</option>
-              <option value="tabulator">Tabulator</option>
+              <option value="tallier">Tallier (Judge)</option>
+              <option value="tabulator">Tabulator (Gatekeeper)</option>
+              <option value="grievancecommittee">Grievance Committee</option>
             </select>
+            <small style={{ color: 'rgba(255,255,255,0.6)', marginTop: '-8px', marginBottom: '8px', display: 'block' }}>
+              Your username will be formatted as: <strong>your_name@{role}.rankit</strong>
+            </small>
           </>
         )}
         {error && <p className="error">{error}</p>}

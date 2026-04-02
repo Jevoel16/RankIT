@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { fetchPublicLeaderboard } from '../api';
 import { useAuth } from '../hooks/useAuth';
+import usePagination from '../hooks/usePagination';
+import TablePager from '../components/TablePager';
 
 export default function CommunityHome() {
   const { isAuthenticated } = useAuth();
+  const location = useLocation();
+  const notice = useMemo(() => new URLSearchParams(location.search).get('notice') || '', [location.search]);
   const [payload, setPayload] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedEventId, setSelectedEventId] = useState('');
@@ -77,6 +81,7 @@ export default function CommunityHome() {
   }, [tickerMessage]);
 
   const leaderboard = payload?.leaderboard || [];
+  const leaderboardPagination = usePagination(leaderboard, 10);
   const topThree = useMemo(() => leaderboard.slice(0, 3), [leaderboard]);
 
   if (loading) {
@@ -175,6 +180,8 @@ export default function CommunityHome() {
         </div>
       </header>
 
+      {notice && <div className="community-ticker">{notice}</div>}
+
       {tickerMessage && <div className="community-ticker">{tickerMessage}</div>}
 
       <section className="community-podium" aria-label="Top 3 podium">
@@ -210,7 +217,7 @@ export default function CommunityHome() {
             </tr>
           </thead>
           <tbody>
-            {leaderboard.map((row) => (
+            {leaderboardPagination.paginatedItems.map((row) => (
               <tr key={row.contestantId}>
                 <td>{row.liveRank}</td>
                 <td>
@@ -223,6 +230,15 @@ export default function CommunityHome() {
           </tbody>
         </table>
       </div>
+      <TablePager
+        page={leaderboardPagination.page}
+        totalPages={leaderboardPagination.totalPages}
+        totalItems={leaderboardPagination.totalItems}
+        canPrev={leaderboardPagination.canPrev}
+        canNext={leaderboardPagination.canNext}
+        onPrev={leaderboardPagination.goPrev}
+        onNext={leaderboardPagination.goNext}
+      />
 
       {payload?.event?.displayStatus === 'Completed' && (
         <section className="status-card community-winners">

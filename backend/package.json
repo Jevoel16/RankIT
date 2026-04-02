@@ -8,7 +8,8 @@
     "start:prod": "set NODE_ENV=production&& node server.js",
     "dev": "nodemon server.js",
     "start:dev": "set NODE_ENV=development&& nodemon server.js",
-    "seed:users": "node scripts/seedUsers.js"
+    "seed:users": "node scripts/seedUsers.js",
+    "seed:dummy": "node scripts/seedDummyData.js"
   },
   "keywords": [],
   "author": "",
@@ -20,8 +21,7 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^9.1.5",
-    "rankit-workspace": "file:.."
+    "mongoose": "^9.1.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"

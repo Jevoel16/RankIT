@@ -48,7 +48,39 @@ const eventSchema = new mongoose.Schema({
         type: String,
         enum: ['locked', 'unlocked'],
         default: 'locked'
-    }
+    },
+    eventStatus: {
+        type: String,
+        enum: ['scheduled', 'live', 'finalized'],
+        default: 'scheduled'
+    },
+    finalizedAt: {
+        type: Date,
+        default: null
+    },
+    finalizedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    finalResults: [{
+        contestantId: mongoose.Schema.Types.ObjectId,
+        contestantNumber: Number,
+        contestantName: String,
+        rank: Number,
+        averageScore: Number,
+        totalDeductions: Number,
+        finalScore: Number
+    }],
+    tabulatorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
+    },
+    assignedTallierIds: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }]
 }, {
     timestamps: true
 });

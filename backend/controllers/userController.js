@@ -75,14 +75,18 @@ const createUser = async (req, res) => {
             return res.status(400).json({ message: 'username, password, and role are required.' });
         }
 
-        const existingUser = await User.findOne({ username });
+        // Format domain-based username: username@role.rankit
+        const baseUsername = username.split('@')[0].toLowerCase().trim();
+        const domainUsername = `${baseUsername}@${role}.rankit`;
+
+        const existingUser = await User.findOne({ username: domainUsername });
         if (existingUser) {
             return res.status(409).json({ message: 'Username already exists.' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const user = await User.create({
-            username,
+            username: domainUsername,
             password: hashedPassword,
             role,
             isApproved: true,
@@ -94,7 +98,12 @@ const createUser = async (req, res) => {
             actorId: req.user._id,
             entityType: 'user',
             entityId: user._id,
-            metadata: { username: user.username, role: user.role, bypassApproval: true }
+            metadata: { 
+                username: user.username, 
+                role: user.role, 
+                bypassApproval: true,
+                identityFormat: 'domain-based'
+            }
         });
 
         return res.status(201).json({

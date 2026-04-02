@@ -1,6 +1,7 @@
 const Event = require('../models/Event');
 const Tally = require('../models/Tally');
 const Audit = require('../models/Audit');
+const User = require('../models/User');
 
 let attemptedLegacyCategoryIndexDrop = false;
 
@@ -9,6 +10,39 @@ const writeAudit = async ({ action, actorId, eventId, entityType, entityId, meta
         await Audit.create({ action, actorId, eventId, entityType, entityId, metadata });
     } catch (error) {
         // Logging failures should not block core endpoints.
+    }
+};
+
+const normalizeObjectIdList = (items) => {
+    if (!Array.isArray(items)) return [];
+    return [...new Set(items.filter(Boolean).map((id) => id.toString()))];
+};
+
+const validateAssignments = async ({ tabulatorId, assignedTallierIds }) => {
+    if (tabulatorId) {
+        const tabulator = await User.findOne({
+            _id: tabulatorId,
+            role: 'tabulator',
+            isApproved: true,
+            approvalStatus: 'approved'
+        }).select('_id');
+
+        if (!tabulator) {
+            throw new Error('Assigned tabulator must be an approved tabulator user.');
+        }
+    }
+
+    if (assignedTallierIds && assignedTallierIds.length > 0) {
+        const tallierCount = await User.countDocuments({
+            _id: { $in: assignedTallierIds },
+            role: 'tallier',
+            isApproved: true,
+            approvalStatus: 'approved'
+        });
+
+        if (tallierCount !== assignedTallierIds.length) {
+            throw new Error('All assigned talliers must be approved tallier users.');
+        }
     }
 };
 
@@ -35,7 +69,20 @@ const computeGatekeeperState = async (eventId) => {
 
 const getEvents = async (req, res) => {
     try {
-        const events = await Event.find().sort({ createdAt: -1 });
+        const role = req.user?.role;
+        const userId = req.user?._id?.toString();
+        const query = {};
+
+        if (role === 'tabulator') {
+            query.tabulatorId = userId;
+        } else if (role === 'tallier') {
+            query.assignedTallierIds = userId;
+        }
+
+        const events = await Event.find(query)
+            .populate('tabulatorId', 'username role')
+            .populate('assignedTallierIds', 'username role')
+            .sort({ createdAt: -1 });
         return res.json(events);
     } catch (error) {
         return res.status(500).json({ message: error.message });
@@ -57,9 +104,18 @@ const getEvent = async (req, res) => {
 
 const createEvent = async (req, res) => {
     try {
+        const normalizedTallierIds = normalizeObjectIdList(req.body.assignedTallierIds);
+
+        await validateAssignments({
+            tabulatorId: req.body.tabulatorId,
+            assignedTallierIds: normalizedTallierIds
+        });
+
         const payload = {
             ...req.body,
-            criteria: (req.body.criteria || []).filter((item) => item && item.label && Number(item.weight) > 0)
+            criteria: (req.body.criteria || []).filter((item) => item && item.label && Number(item.weight) > 0),
+            tabulatorId: req.body.tabulatorId || null,
+            assignedTallierIds: normalizedTallierIds
         };
 
         if (!payload.name || !String(payload.name).trim()) {
@@ -101,6 +157,28 @@ const createEvent = async (req, res) => {
             metadata: { name: event.name, category: event.category }
         });
 
+        if (event.tabulatorId) {
+            await writeAudit({
+                action: 'EVENT_TABULATOR_ASSIGNED',
+                actorId: req.user._id,
+                eventId: event._id,
+                entityType: 'event',
+                entityId: event._id,
+                metadata: { tabulatorId: event.tabulatorId }
+            });
+        }
+
+        if (Array.isArray(event.assignedTallierIds) && event.assignedTallierIds.length > 0) {
+            await writeAudit({
+                action: 'EVENT_TALLIER_ASSIGNED',
+                actorId: req.user._id,
+                eventId: event._id,
+                entityType: 'event',
+                entityId: event._id,
+                metadata: { assignedTallierIds: event.assignedTallierIds }
+            });
+        }
+
         return res.status(201).json(event);
     } catch (error) {
         if (error && error.name === 'ValidationError') {
@@ -126,7 +204,21 @@ const updateEvent = async (req, res) => {
             return res.status(404).json({ message: 'Event not found.' });
         }
 
+        const nextTabulatorId = Object.prototype.hasOwnProperty.call(req.body, 'tabulatorId')
+            ? (req.body.tabulatorId || null)
+            : existing.tabulatorId;
+        const nextAssignedTallierIds = Object.prototype.hasOwnProperty.call(req.body, 'assignedTallierIds')
+            ? normalizeObjectIdList(req.body.assignedTallierIds)
+            : normalizeObjectIdList(existing.assignedTallierIds || []);
+
+        await validateAssignments({
+            tabulatorId: nextTabulatorId,
+            assignedTallierIds: nextAssignedTallierIds
+        });
+
         Object.assign(existing, req.body);
+        existing.tabulatorId = nextTabulatorId;
+        existing.assignedTallierIds = nextAssignedTallierIds;
         const updated = await existing.save();
 
         await writeAudit({
@@ -137,6 +229,28 @@ const updateEvent = async (req, res) => {
             entityId: updated._id,
             metadata: { updates: req.body }
         });
+
+        if (Object.prototype.hasOwnProperty.call(req.body, 'tabulatorId')) {
+            await writeAudit({
+                action: 'EVENT_TABULATOR_ASSIGNED',
+                actorId: req.user._id,
+                eventId: updated._id,
+                entityType: 'event',
+                entityId: updated._id,
+                metadata: { tabulatorId: updated.tabulatorId }
+            });
+        }
+
+        if (Object.prototype.hasOwnProperty.call(req.body, 'assignedTallierIds')) {
+            await writeAudit({
+                action: 'EVENT_TALLIER_ASSIGNED',
+                actorId: req.user._id,
+                eventId: updated._id,
+                entityType: 'event',
+                entityId: updated._id,
+                metadata: { assignedTallierIds: updated.assignedTallierIds }
+            });
+        }
 
         return res.json(updated);
     } catch (error) {
@@ -179,6 +293,162 @@ const getEventUnlockStatus = async (req, res) => {
     }
 };
 
+const patchEventStatus = async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const { eventStatus } = req.body;
+        const adminId = req.user?._id;
+
+        // Validate input
+        if (!['scheduled', 'live', 'finalized'].includes(eventStatus)) {
+            return res.status(400).json({ message: 'Invalid event status. Must be scheduled, live, or finalized.' });
+        }
+
+        const event = await Event.findById(eventId);
+        if (!event) {
+            return res.status(404).json({ message: 'Event not found.' });
+        }
+
+        // Additional checks for finalization
+        if (eventStatus === 'finalized') {
+            // Verify gatekeeper logic is satisfied (all required talliers submitted)
+            const tallyCount = await Tally.distinct('tallierId', { eventId });
+            if (tallyCount.length < event.requiredTalliers) {
+                return res.status(400).json({ 
+                    message: `Cannot finalize: Only ${tallyCount.length} of ${event.requiredTalliers} required talliers have submitted.` 
+                });
+            }
+
+            // Calculate final rankings using aggregation pipeline
+            const Contestant = require('../models/Contestant');
+            
+            const finalRankings = await Contestant.aggregate([
+                {
+                    $match: { eventId: event._id }
+                },
+                {
+                    $lookup: {
+                        from: 'tallies',
+                        let: { contestantId: '$_id' },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $and: [
+                                            { $eq: ['$contestantId', '$$contestantId'] },
+                                            { $eq: ['$eventId', event._id] }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                $group: {
+                                    _id: null,
+                                    averageScore: { $avg: '$totalScore' }
+                                }
+                            }
+                        ],
+                        as: 'stats'
+                    }
+                },
+                {
+                    $unwind: {
+                        path: '$stats',
+                        preserveNullAndEmptyArrays: true
+                    }
+                },
+                {
+                    $addFields: {
+                        averageScore: { $ifNull: ['$stats.averageScore', 0] },
+                        deductionPoints: {
+                            $sum: {
+                                $map: {
+                                    input: { $ifNull: ['$grievances', []] },
+                                    as: 'entry',
+                                    in: { $ifNull: ['$$entry.deductionPoints', 0] }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    $addFields: {
+                        finalScore: { $subtract: ['$averageScore', '$deductionPoints'] }
+                    }
+                },
+                {
+                    $sort: { finalScore: -1, averageScore: -1 }
+                },
+                {
+                    $group: {
+                        _id: null,
+                        results: {
+                            $push: {
+                                contestantId: '$_id',
+                                contestantNumber: '$contestantNumber',
+                                contestantName: '$name',
+                                averageScore: '$averageScore',
+                                totalDeductions: '$deductionPoints',
+                                finalScore: '$finalScore'
+                            }
+                        }
+                    }
+                },
+                {
+                    $unwind: {
+                        path: '$results',
+                        includeArrayIndex: 'rank'
+                    }
+                },
+                {
+                    $addFields: {
+                        'results.rank': { $add: ['$rank', 1] }
+                    }
+                },
+                {
+                    $replaceRoot: { newRoot: '$results' }
+                }
+            ]);
+
+            event.finalResults = finalRankings;
+            event.finalizedAt = new Date();
+            event.finalizedBy = adminId;
+        }
+
+        // Update event status
+        event.eventStatus = eventStatus;
+        await event.save();
+
+        // Log audit trail
+        await writeAudit({
+            action: `EVENT_${eventStatus.toUpperCase()}`,
+            actorId: adminId,
+            eventId: event._id,
+            entityType: 'event',
+            entityId: event._id,
+            metadata: {
+                eventName: event.name,
+                previousStatus: event.eventStatus,
+                newStatus: eventStatus,
+                finalResultsCount: eventStatus === 'finalized' ? event.finalResults.length : 0
+            }
+        });
+
+        return res.status(200).json({
+            message: `Event status updated to ${eventStatus}`,
+            event: {
+                _id: event._id,
+                name: event.name,
+                eventStatus: event.eventStatus,
+                finalizedAt: event.finalizedAt,
+                finalResults: event.finalResults
+            }
+        });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     computeGatekeeperState,
     getEvents,
@@ -186,5 +456,6 @@ module.exports = {
     createEvent,
     updateEvent,
     deleteEvent,
-    getEventUnlockStatus
+    getEventUnlockStatus,
+    patchEventStatus
 };

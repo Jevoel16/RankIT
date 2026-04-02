@@ -23,7 +23,7 @@ router.post('/admin-create', authenticate, authorize('admin', 'superadmin'), adm
 
 router
     .route('/')
-    .get(authenticate, authorize('admin', 'superadmin'), getUsers)
+    .get(authenticate, authorize('superadmin'), getUsers)
     .post(authenticate, authorize('admin', 'superadmin'), createUser);
 
 router

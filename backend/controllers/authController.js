@@ -33,27 +33,45 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'username and password are required.' });
     }
 
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      return res.status(409).json({ message: 'Username already exists.' });
-    }
-
-    const allowedSelfRegisterRoles = ['tallier', 'tabulator'];
+    const allowedSelfRegisterRoles = ['tallier', 'tabulator', 'grievancecommittee'];
     const requestedRole = role || 'tallier';
 
     if (!allowedSelfRegisterRoles.includes(requestedRole)) {
       return res.status(403).json({
-        message: 'Only tallier and tabulator roles can register directly. Admin accounts are created by superadmin.'
+        message: 'Only tallier, tabulator, and grievancecommittee roles can register directly. Admin accounts are created by superadmin.'
       });
+    }
+
+    // Format domain-based username: username@role.rankit
+    const baseUsername = username.split('@')[0].toLowerCase().trim();
+    const domainUsername = `${baseUsername}@${requestedRole}.rankit`;
+
+    const existingUser = await User.findOne({ username: domainUsername });
+    if (existingUser) {
+      return res.status(409).json({ message: 'Username already exists. Please choose a different username.' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await User.create({
-      username,
+      username: domainUsername,
       password: hashedPassword,
       role: requestedRole,
       isApproved: false,
       approvalStatus: 'pending'
+    });
+
+    // Log registration audit entry
+    await writeAudit({
+      action: 'USER_REGISTERED',
+      actorId: user._id,
+      entityType: 'user',
+      entityId: user._id,
+      metadata: {
+        username: user.username,
+        role: user.role,
+        identityFormat: 'domain-based',
+        approvalStatus: 'pending'
+      }
     });
 
     return res.status(201).json({
@@ -79,7 +97,13 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: 'username and password are required.' });
     }
 
-    const user = await User.findOne({ username });
+    // Accept both formats: "user" (will search as user@role.rankit for all roles) or "user@role.rankit"
+    let searchUsername = username.toLowerCase().trim();
+    
+    // If user provided without domain, we need to validate against domain format
+    // For now, accept full domain format
+    let user = await User.findOne({ username: searchUsername });
+    
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
@@ -96,6 +120,19 @@ const loginUser = async (req, res) => {
     }
 
     const token = createToken(user._id.toString());
+
+    // Log login audit entry
+    await writeAudit({
+      action: 'USER_LOGGED_IN',
+      actorId: user._id,
+      entityType: 'user',
+      entityId: user._id,
+      metadata: {
+        username: user.username,
+        role: user.role,
+        timestamp: new Date().toISOString()
+      }
+    });
 
     return res.json({
       token,

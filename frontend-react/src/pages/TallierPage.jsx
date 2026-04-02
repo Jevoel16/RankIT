@@ -1,22 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchContestants, fetchEvents, submitTally } from '../api';
+import { useParams } from 'react-router-dom';
+import { fetchContestants, fetchEvents, fetchTallierScoreSheet, submitTally } from '../api';
+import { useActiveEvent } from '../hooks/useActiveEvent';
 import { useAuth } from '../hooks/useAuth';
 import ScoreInputCard from '../components/ScoreInputCard';
+import PrintReportPreviewModal from '../components/PrintReportPreviewModal';
+import TallyReportPDF from '../components/TallyReportPDF';
 
 export default function TallierPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const { activeEventId, setActiveEvent } = useActiveEvent();
+  const { eventId: eventIdFromRoute } = useParams();
   const [events, setEvents] = useState([]);
   const [contestants, setContestants] = useState([]);
+  const [activeTab, setActiveTab] = useState('scoring');
   const [selectedEventId, setSelectedEventId] = useState('');
   const [contestantId, setContestantId] = useState('');
   const [scores, setScores] = useState({});
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-
-  const onPrint = () => {
-    window.print();
-  };
+  const [submittedByContestant, setSubmittedByContestant] = useState({});
+  const [printCriteria, setPrintCriteria] = useState([]);
+  const [printRows, setPrintRows] = useState([]);
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
 
   useEffect(() => {
     async function loadEvents() {
@@ -24,7 +30,9 @@ export default function TallierPage() {
         const data = await fetchEvents(token);
         setEvents(data);
         if (data.length > 0) {
-          setSelectedEventId(data[0]._id);
+          const matched = eventIdFromRoute && data.some((item) => item._id === eventIdFromRoute);
+          const fromActiveContext = activeEventId && data.some((item) => item._id === activeEventId);
+          setSelectedEventId(matched ? eventIdFromRoute : fromActiveContext ? activeEventId : data[0]._id);
         }
       } catch (err) {
         setError(err.message);
@@ -32,12 +40,30 @@ export default function TallierPage() {
     }
 
     loadEvents();
-  }, [token]);
+  }, [token, eventIdFromRoute, activeEventId]);
 
   const selectedEvent = useMemo(
     () => events.find((event) => event._id === selectedEventId),
     [events, selectedEventId]
   );
+
+  const tallyReportData = useMemo(
+    () => ({
+      eventName: selectedEvent?.name || '-',
+      generatedByName: user?.username || 'Unknown User',
+      generatedAt: new Date().toISOString(),
+      criteria: printCriteria,
+      rows: printRows
+    }),
+    [selectedEvent, user, printCriteria, printRows]
+  );
+
+  const tallyReportDocument = useMemo(
+    () => <TallyReportPDF reportData={tallyReportData} />,
+    [tallyReportData]
+  );
+
+  const tallyReportFileName = `${String(selectedEvent?.name || 'event').replace(/\s+/g, '_')}_tally_report.pdf`;
 
   useEffect(() => {
     const fresh = {};
@@ -45,9 +71,18 @@ export default function TallierPage() {
       fresh[criterion.label] = 0;
     });
     setScores(fresh);
-    setSubmitted(false);
     setStatus('');
+    setError('');
+    setActiveTab('scoring');
   }, [selectedEventId, selectedEvent]);
+
+  useEffect(() => {
+    setStatus('');
+    setError('');
+  }, [contestantId]);
+
+  const currentSubmissionKey = `${selectedEventId || ''}:${contestantId || ''}`;
+  const isCurrentContestantSubmitted = Boolean(submittedByContestant[currentSubmissionKey]);
 
   useEffect(() => {
     async function loadContestants() {
@@ -60,6 +95,7 @@ export default function TallierPage() {
       try {
         const data = await fetchContestants(selectedEventId, token);
         setContestants(data);
+        setActiveEvent({ eventId: selectedEventId, contestants: data, source: 'tallier' });
         setContestantId((prev) => (data.some((item) => item._id === prev) ? prev : data[0]?._id || ''));
       } catch (err) {
         setContestants([]);
@@ -69,6 +105,27 @@ export default function TallierPage() {
     }
 
     loadContestants();
+  }, [selectedEventId, token, setActiveEvent]);
+
+  useEffect(() => {
+    async function loadScoreSheet() {
+      if (!selectedEventId) {
+        setPrintCriteria([]);
+        setPrintRows([]);
+        return;
+      }
+
+      try {
+        const sheet = await fetchTallierScoreSheet(selectedEventId, token);
+        setPrintCriteria(sheet.criteria || []);
+        setPrintRows(sheet.rows || []);
+      } catch (_err) {
+        setPrintCriteria([]);
+        setPrintRows([]);
+      }
+    }
+
+    loadScoreSheet();
   }, [selectedEventId, token]);
 
   const setScore = (label, value) => {
@@ -112,9 +169,27 @@ export default function TallierPage() {
         token
       );
 
-      setSubmitted(true);
-      setStatus('Score submitted successfully. Submit is now locked to prevent duplicate entry.');
+      setSubmittedByContestant((prev) => ({
+        ...prev,
+        [currentSubmissionKey]: true
+      }));
+      try {
+        const sheet = await fetchTallierScoreSheet(selectedEventId, token);
+        setPrintCriteria(sheet.criteria || []);
+        setPrintRows(sheet.rows || []);
+      } catch (_err) {
+        // Keep current UI flow even if score sheet refresh fails.
+      }
+      setStatus('Score submitted successfully. This contestant is now locked to prevent duplicate entry.');
     } catch (err) {
+      if (String(err.message || '').toLowerCase().includes('duplicate score submission')) {
+        setSubmittedByContestant((prev) => ({
+          ...prev,
+          [currentSubmissionKey]: true
+        }));
+        setStatus('This contestant was already scored by you for this event. Select another contestant.');
+        return;
+      }
       setError(err.message);
     }
   };
@@ -123,92 +198,116 @@ export default function TallierPage() {
     <section className="panel">
       <h2>Tallier Scoring Form</h2>
       <p className="muted">Criteria are fetched from event configuration and rendered dynamically.</p>
-      <form onSubmit={onSubmit} className="stack">
-        <label htmlFor="event-select">Event</label>
-        <select
-          id="event-select"
-          value={selectedEventId}
-          onChange={(e) => setSelectedEventId(e.target.value)}
-          required
-        >
-          {events.map((event) => (
-            <option key={event._id} value={event._id}>
-              {event.name}
-            </option>
-          ))}
-        </select>
 
-        <label htmlFor="contestant-id">Contestant</label>
-        <select
-          id="contestant-id"
-          value={contestantId}
-          onChange={(e) => setContestantId(e.target.value)}
-          required
-          disabled={contestants.length === 0}
+      <div className="sub-tabs" role="tablist" aria-label="Tallier Actions">
+        <button
+          type="button"
+          className={`subtab-btn ${activeTab === 'scoring' ? 'active' : ''}`}
+          onClick={() => setActiveTab('scoring')}
         >
-          {contestants.length === 0 && <option value="">No contestants available</option>}
-          {contestants.map((contestant) => (
-            <option key={contestant._id} value={contestant._id}>
-              {contestant.contestantNumber ? `#${contestant.contestantNumber} - ` : ''}
-              {contestant.name}
-            </option>
-          ))}
-        </select>
+          Tallier Scoring Form
+        </button>
+        <button
+          type="button"
+          className={`subtab-btn ${activeTab === 'print' ? 'active' : ''}`}
+          onClick={() => setActiveTab('print')}
+        >
+          Download Tally PDF
+        </button>
+      </div>
 
-        <div className="score-grid">
-          {(selectedEvent?.criteria || []).map((criterion) => (
-            <ScoreInputCard
-              key={criterion.label}
-              criterion={criterion}
-              value={scores[criterion.label] ?? 0}
-              onChange={(value) => setScore(criterion.label, value)}
-            />
-          ))}
+      {activeTab === 'scoring' && (
+        <div className="tab-content-shell">
+          <div className="panel stack tab-content-panel">
+            <form onSubmit={onSubmit} className="stack">
+              <label htmlFor="event-select">Event</label>
+              <select
+                id="event-select"
+                value={selectedEventId}
+                onChange={(e) => {
+                  const nextEventId = e.target.value;
+                  setSelectedEventId(nextEventId);
+                  setActiveEvent({ eventId: nextEventId, source: 'tallier-manual' });
+                }}
+                required
+              >
+                {events.map((event) => (
+                  <option key={event._id} value={event._id}>
+                    {event.name}
+                  </option>
+                ))}
+              </select>
+
+              <label htmlFor="contestant-id">Contestant</label>
+              <select
+                id="contestant-id"
+                value={contestantId}
+                onChange={(e) => setContestantId(e.target.value)}
+                required
+                disabled={contestants.length === 0}
+              >
+                {contestants.length === 0 && <option value="">No contestants available</option>}
+                {contestants.map((contestant) => (
+                  <option key={contestant._id} value={contestant._id}>
+                    {contestant.contestantNumber ? `#${contestant.contestantNumber} - ` : ''}
+                    {contestant.name}
+                  </option>
+                ))}
+              </select>
+
+              <div className="score-grid">
+                {(selectedEvent?.criteria || []).map((criterion) => (
+                  <ScoreInputCard
+                    key={criterion.label}
+                    criterion={criterion}
+                    value={scores[criterion.label] ?? 0}
+                    onChange={(value) => setScore(criterion.label, value)}
+                  />
+                ))}
+              </div>
+
+              {error && <p className="error">{error}</p>}
+              {status && <p className="success">{status}</p>}
+
+              <button type="submit" disabled={isCurrentContestantSubmitted || !selectedEventId || !contestantId}>
+                {isCurrentContestantSubmitted ? 'Already Submitted For Contestant' : 'Submit Score'}
+              </button>
+            </form>
+          </div>
         </div>
+      )}
 
-        {error && <p className="error">{error}</p>}
-        {status && <p className="success">{status}</p>}
+      {activeTab === 'print' && (
+        <div className="tab-content-shell">
+          <div className="panel stack tab-content-panel">
+            <div className="section-head">
+              <h3>Download Tally PDF</h3>
+              <span className="muted">Preview and download tally report</span>
+            </div>
 
-        <button type="submit" disabled={submitted || !selectedEventId || !contestantId}>
-          {submitted ? 'Already Submitted' : 'Submit Score'}
-        </button>
-        <button type="button" className="ghost-btn no-print" onClick={onPrint}>
-          Print Tally PDF
-        </button>
-      </form>
+            <p className="muted">
+              Event: <strong>{selectedEvent?.name || '-'}</strong>
+            </p>
+            <p className="muted">The generated PDF includes all contestants for this event.</p>
 
-      <section className="print-only print-report">
-        <h2>Tally Report</h2>
-        <p>Event: {selectedEvent?.name || '-'}</p>
-        <p>
-          Contestant: {selectedContestant?.contestantNumber ? `#${selectedContestant.contestantNumber} - ` : ''}
-          {selectedContestant?.name || '-'}
-        </p>
-        <p>Printed: {new Date().toLocaleString()}</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Criterion</th>
-              <th>Score</th>
-              <th>Max</th>
-            </tr>
-          </thead>
-          <tbody>
-            {scoreRows.map((row) => (
-              <tr key={row.label}>
-                <td>{row.label}</td>
-                <td>{row.value}</td>
-                <td>{row.maxScore}</td>
-              </tr>
-            ))}
-            <tr>
-              <td><strong>Total</strong></td>
-              <td><strong>{totalScore}</strong></td>
-              <td>-</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+            <button type="button" className="ghost-btn no-print" onClick={() => setPrintPreviewOpen(true)}>
+              Preview Tally PDF
+            </button>
+          </div>
+        </div>
+      )}
+
+      <PrintReportPreviewModal
+        open={printPreviewOpen}
+        title="Tally Report Preview"
+        subtitle="Review before download"
+        onClose={() => setPrintPreviewOpen(false)}
+        fileName={tallyReportFileName}
+        pdfDocument={tallyReportDocument}
+        downloadLabel="Download Tally PDF"
+        reportType="tally_report"
+        eventId={selectedEventId}
+      />
     </section>
   );
 }

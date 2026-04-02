@@ -1,9 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchAnalyticsOverview, fetchAuditLogs, fetchUsers } from '../api';
 import { useAuth } from '../hooks/useAuth';
 import AdminUsers from '../components/AdminUsers';
+import PrintReportPreviewModal from '../components/PrintReportPreviewModal';
+import AuditTrailPDF from '../components/AuditTrailPDF';
+import UsersDirectoryPDF from '../components/UsersDirectoryPDF';
+import usePagination from '../hooks/usePagination';
+import TablePager from '../components/TablePager';
 
 function RoleTable({ title, rows }) {
+  const roleRowsPagination = usePagination(rows || [], 10);
+
   return (
     <div className="panel">
       <div className="section-head">
@@ -25,7 +32,7 @@ function RoleTable({ title, rows }) {
                 <td colSpan={3} className="muted">No users in this role.</td>
               </tr>
             )}
-            {rows.map((user) => (
+            {roleRowsPagination.paginatedItems.map((user) => (
               <tr key={user._id || user.id}>
                 <td>{user.username}</td>
                 <td>{user.isApproved ? 'Yes' : 'No'}</td>
@@ -35,6 +42,15 @@ function RoleTable({ title, rows }) {
           </tbody>
         </table>
       </div>
+      <TablePager
+        page={roleRowsPagination.page}
+        totalPages={roleRowsPagination.totalPages}
+        totalItems={roleRowsPagination.totalItems}
+        canPrev={roleRowsPagination.canPrev}
+        canNext={roleRowsPagination.canNext}
+        onPrev={roleRowsPagination.goPrev}
+        onNext={roleRowsPagination.goNext}
+      />
     </div>
   );
 }
@@ -183,13 +199,58 @@ function EventAverageLineGraph({ rows }) {
 }
 
 export default function SuperadminPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [activeTab, setActiveTab] = useState('analytics');
+  const [analyticsSubtab, setAnalyticsSubtab] = useState('users-by-role');
   const [userSubtab, setUserSubtab] = useState('approval');
+  const [usersSearch, setUsersSearch] = useState('');
+  const [usersRoleFilter, setUsersRoleFilter] = useState('all');
+  const [usersStatusFilter, setUsersStatusFilter] = useState('all');
+  const [usersPreviewOpen, setUsersPreviewOpen] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [logs, setLogs] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [auditFromDate, setAuditFromDate] = useState('');
+  const [auditToDate, setAuditToDate] = useState('');
+  const [auditUser, setAuditUser] = useState('');
+  const [auditAction, setAuditAction] = useState('');
+  const [auditPreviewOpen, setAuditPreviewOpen] = useState(false);
   const [error, setError] = useState('');
+
+  const hasHydratedRef = useRef(false);
+
+  const actorKey = useMemo(
+    () => user?.id || user?._id || user?.username || 'superadmin',
+    [user]
+  );
+
+  const stateStorageKey = useMemo(() => `rankit_superadmin_state_${actorKey}`, [actorKey]);
+  const actionsStorageKey = useMemo(() => `rankit_superadmin_actions_${actorKey}`, [actorKey]);
+
+  const recordUserAction = (actionType, value) => {
+    try {
+      const saved = localStorage.getItem(actionsStorageKey);
+      const history = saved ? JSON.parse(saved) : [];
+      history.push({
+        actionType,
+        value,
+        timestamp: new Date().toISOString()
+      });
+      const bounded = history.slice(-300);
+      localStorage.setItem(actionsStorageKey, JSON.stringify(bounded));
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+  };
+
+  const refreshAuditLogs = async () => {
+    try {
+      const auditData = await fetchAuditLogs(token);
+      setLogs(auditData);
+    } catch (err) {
+      // Keep existing logs on refresh failures.
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -210,14 +271,231 @@ export default function SuperadminPage() {
     loadData();
   }, [token]);
 
+  useEffect(() => {
+    if (activeTab !== 'audit') {
+      return undefined;
+    }
+
+    refreshAuditLogs();
+    return undefined;
+  }, [activeTab, token]);
+
+  useEffect(() => {
+    if (!stateStorageKey) {
+      return;
+    }
+
+    try {
+      const saved = localStorage.getItem(stateStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setActiveTab(parsed.activeTab || 'analytics');
+        setAnalyticsSubtab(parsed.analyticsSubtab || 'users-by-role');
+        setUserSubtab(parsed.userSubtab || 'approval');
+        setUsersSearch(parsed.usersSearch || '');
+        setUsersRoleFilter(parsed.usersRoleFilter || 'all');
+        setUsersStatusFilter(parsed.usersStatusFilter || 'all');
+        setAuditFromDate(parsed.auditFromDate || '');
+        setAuditToDate(parsed.auditToDate || '');
+        setAuditUser(parsed.auditUser || '');
+        setAuditAction(parsed.auditAction || '');
+      }
+    } catch (_error) {
+      // Ignore malformed storage.
+    } finally {
+      hasHydratedRef.current = true;
+    }
+  }, [stateStorageKey]);
+
+  useEffect(() => {
+    if (!hasHydratedRef.current) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        stateStorageKey,
+        JSON.stringify({
+          activeTab,
+          analyticsSubtab,
+          userSubtab,
+          usersSearch,
+          usersRoleFilter,
+          usersStatusFilter,
+          auditFromDate,
+          auditToDate,
+          auditUser,
+          auditAction
+        })
+      );
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+  }, [
+    stateStorageKey,
+    activeTab,
+    analyticsSubtab,
+    userSubtab,
+    usersSearch,
+    usersRoleFilter,
+    usersStatusFilter,
+    auditFromDate,
+    auditToDate,
+    auditUser,
+    auditAction
+  ]);
+
+  useEffect(() => {
+    if (!hasHydratedRef.current) {
+      return;
+    }
+    recordUserAction('active_tab_changed', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!hasHydratedRef.current) {
+      return;
+    }
+    recordUserAction('analytics_subtab_changed', analyticsSubtab);
+  }, [analyticsSubtab]);
+
+  useEffect(() => {
+    if (!hasHydratedRef.current) {
+      return;
+    }
+    recordUserAction('user_subtab_changed', userSubtab);
+  }, [userSubtab]);
+
+  useEffect(() => {
+    if (!hasHydratedRef.current) {
+      return;
+    }
+    recordUserAction('users_filter_updated', {
+      search: usersSearch,
+      role: usersRoleFilter,
+      status: usersStatusFilter
+    });
+  }, [usersSearch, usersRoleFilter, usersStatusFilter]);
+
+  useEffect(() => {
+    if (!hasHydratedRef.current) {
+      return;
+    }
+    recordUserAction('audit_filter_updated', {
+      from: auditFromDate,
+      to: auditToDate,
+      user: auditUser,
+      action: auditAction
+    });
+  }, [auditFromDate, auditToDate, auditUser, auditAction]);
+
   const groupedUsers = useMemo(
     () => ({
       admin: allUsers.filter((user) => user.role === 'admin'),
       tallier: allUsers.filter((user) => user.role === 'tallier'),
-      tabulator: allUsers.filter((user) => user.role === 'tabulator')
+      tabulator: allUsers.filter((user) => user.role === 'tabulator'),
+      grievancecommittee: allUsers.filter((user) => user.role === 'grievancecommittee')
     }),
     [allUsers]
   );
+
+  const filteredUsersRows = useMemo(() => {
+    const keyword = usersSearch.trim().toLowerCase();
+    return (allUsers || []).filter((user) => {
+      const username = String(user.username || '').toLowerCase();
+      const role = String(user.role || '').toLowerCase();
+      const approval = user.approvalStatus || (user.isApproved ? 'approved' : 'pending');
+
+      if (keyword && !username.includes(keyword)) {
+        return false;
+      }
+
+      if (usersRoleFilter !== 'all' && role !== usersRoleFilter) {
+        return false;
+      }
+
+      if (usersStatusFilter !== 'all' && approval !== usersStatusFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [allUsers, usersSearch, usersRoleFilter, usersStatusFilter]);
+
+  const usersPreviewFileName = useMemo(() => {
+    const datePart = new Date().toISOString().slice(0, 10);
+    return `users_directory_${datePart}.pdf`;
+  }, []);
+
+  const usersSummary = useMemo(
+    () => ({
+      role: 'All Users',
+      search: usersSearch.trim() || 'Any',
+      roleFilter: usersRoleFilter === 'all' ? 'Any' : usersRoleFilter,
+      status: usersStatusFilter === 'all' ? 'Any' : usersStatusFilter
+    }),
+    [usersSearch, usersRoleFilter, usersStatusFilter]
+  );
+
+  const usersPreviewDocument = useMemo(
+    () => <UsersDirectoryPDF title="All Users Directory" users={filteredUsersRows} summary={usersSummary} generatedAt={new Date()} />,
+    [filteredUsersRows, usersSummary]
+  );
+
+  const usersDirectoryPagination = usePagination(filteredUsersRows, 10);
+
+  const auditUsers = useMemo(
+    () => [...new Set((logs || []).map((item) => item?.actorId?.username || 'System'))].sort((a, b) => a.localeCompare(b)),
+    [logs]
+  );
+
+  const auditActions = useMemo(
+    () => [...new Set((logs || []).map((item) => item?.action).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [logs]
+  );
+
+  const filteredLogs = useMemo(() => {
+    const fromDate = auditFromDate ? new Date(`${auditFromDate}T00:00:00`) : null;
+    const toDate = auditToDate ? new Date(`${auditToDate}T23:59:59.999`) : null;
+
+    return (logs || []).filter((log) => {
+      const createdAt = new Date(log.createdAt);
+      const username = log?.actorId?.username || 'System';
+
+      if (fromDate && createdAt < fromDate) return false;
+      if (toDate && createdAt > toDate) return false;
+      if (auditUser && username !== auditUser) return false;
+      if (auditAction && log.action !== auditAction) return false;
+      return true;
+    });
+  }, [logs, auditFromDate, auditToDate, auditUser, auditAction]);
+
+  const auditPagination = usePagination(filteredLogs, 10);
+
+  const openAuditPreview = () => {
+    setError('');
+    setAuditPreviewOpen(true);
+  };
+
+  const auditSummary = useMemo(
+    () => ({
+      from: auditFromDate || 'Any',
+      to: auditToDate || 'Any',
+      user: auditUser || 'Any',
+      action: auditAction || 'Any'
+    }),
+    [auditAction, auditFromDate, auditToDate, auditUser]
+  );
+
+  const auditPreviewDocument = useMemo(
+    () => <AuditTrailPDF logs={filteredLogs} summary={auditSummary} generatedAt={new Date()} />,
+    [filteredLogs, auditSummary]
+  );
+
+  const auditPreviewFileName = useMemo(() => {
+    const datePart = new Date().toISOString().slice(0, 10);
+    return `filtered_audit_trail_${datePart}.pdf`;
+  }, []);
 
   return (
     <section className="admin-workspace">
@@ -261,9 +539,39 @@ export default function SuperadminPage() {
             <div className="kpi-chip"><strong>Tallies</strong>{analytics?.totals?.tallies ?? 0}</div>
           </div>
 
-          <RoleDistributionGraph rows={analytics?.usersByRole} />
-          <EventSubmissionsGraph rows={analytics?.talliesByEvent} />
-          <EventAverageLineGraph rows={analytics?.talliesByEvent} />
+          <div className="sub-tabs" role="tablist" aria-label="Analytics Visualizations">
+            <button
+              type="button"
+              className={`subtab-btn ${analyticsSubtab === 'users-by-role' ? 'active' : ''}`}
+              onClick={() => setAnalyticsSubtab('users-by-role')}
+            >
+              Users By Role
+            </button>
+            <button
+              type="button"
+              className={`subtab-btn ${analyticsSubtab === 'event-submissions' ? 'active' : ''}`}
+              onClick={() => setAnalyticsSubtab('event-submissions')}
+            >
+              Event Submissions
+            </button>
+            <button
+              type="button"
+              className={`subtab-btn ${analyticsSubtab === 'average-score-trend' ? 'active' : ''}`}
+              onClick={() => setAnalyticsSubtab('average-score-trend')}
+            >
+              Average Score Trend
+            </button>
+          </div>
+
+          {analyticsSubtab === 'users-by-role' && (
+            <RoleDistributionGraph rows={analytics?.usersByRole} />
+          )}
+          {analyticsSubtab === 'event-submissions' && (
+            <EventSubmissionsGraph rows={analytics?.talliesByEvent} />
+          )}
+          {analyticsSubtab === 'average-score-trend' && (
+            <EventAverageLineGraph rows={analytics?.talliesByEvent} />
+          )}
         </div>
       )}
 
@@ -291,24 +599,10 @@ export default function SuperadminPage() {
             </button>
             <button
               type="button"
-              className={`subtab-btn ${userSubtab === 'admins' ? 'active' : ''}`}
-              onClick={() => setUserSubtab('admins')}
+              className={`subtab-btn ${userSubtab === 'users' ? 'active' : ''}`}
+              onClick={() => setUserSubtab('users')}
             >
-              Admin Users
-            </button>
-            <button
-              type="button"
-              className={`subtab-btn ${userSubtab === 'talliers' ? 'active' : ''}`}
-              onClick={() => setUserSubtab('talliers')}
-            >
-              Tallier Users
-            </button>
-            <button
-              type="button"
-              className={`subtab-btn ${userSubtab === 'tabulators' ? 'active' : ''}`}
-              onClick={() => setUserSubtab('tabulators')}
-            >
-              Tabulator Users
+              Users
             </button>
           </div>
 
@@ -330,10 +624,105 @@ export default function SuperadminPage() {
               showDirectory={false}
             />
           )}
-          {userSubtab === 'admins' && <RoleTable title="Admin Users" rows={groupedUsers.admin} />}
-          {userSubtab === 'talliers' && <RoleTable title="Tallier Users" rows={groupedUsers.tallier} />}
-          {userSubtab === 'tabulators' && (
-            <RoleTable title="Tabulator Users" rows={groupedUsers.tabulator} />
+          {userSubtab === 'users' && (
+            <div className="panel stack">
+              <div className="section-head">
+                <h3>Users Directory</h3>
+                <span className="muted">All-users listing and export</span>
+              </div>
+
+              <p className="muted">Shows all users with role, approval, and status details.</p>
+
+              <div className="user-filter-row">
+                <div>
+                  <label htmlFor="users-search">Filter Username</label>
+                  <input
+                    id="users-search"
+                    type="text"
+                    placeholder="Search username"
+                    value={usersSearch}
+                    onChange={(e) => setUsersSearch(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="users-role-filter">Role</label>
+                  <select
+                    id="users-role-filter"
+                    value={usersRoleFilter}
+                    onChange={(e) => setUsersRoleFilter(e.target.value)}
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="superadmin">superadmin</option>
+                    <option value="admin">admin</option>
+                    <option value="tabulator">tabulator</option>
+                    <option value="tallier">tallier</option>
+                    <option value="grievancecommittee">grievancecommittee</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="users-status">Approval Status</label>
+                  <select
+                    id="users-status"
+                    value={usersStatusFilter}
+                    onChange={(e) => setUsersStatusFilter(e.target.value)}
+                  >
+                    <option value="all">All Status</option>
+                    <option value="approved">approved</option>
+                    <option value="pending">pending</option>
+                    <option value="rejected">rejected</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="action-cell">
+                <button type="button" className="ghost-btn" onClick={() => setUsersPreviewOpen(true)}>
+                  Preview Users PDF
+                </button>
+              </div>
+
+              <div className="panel">
+                <div className="section-head">
+                  <h3>All Users</h3>
+                  <span className="muted">Filtered Directory</span>
+                </div>
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Approved</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsersRows.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="muted">No users match the selected filters.</td>
+                        </tr>
+                      )}
+                      {usersDirectoryPagination.paginatedItems.map((user) => (
+                        <tr key={user._id || user.id}>
+                          <td>{user.username}</td>
+                          <td>{user.role}</td>
+                          <td>{user.isApproved ? 'Yes' : 'No'}</td>
+                          <td>{user.approvalStatus || (user.isApproved ? 'approved' : 'pending')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <TablePager
+                  page={usersDirectoryPagination.page}
+                  totalPages={usersDirectoryPagination.totalPages}
+                  totalItems={usersDirectoryPagination.totalItems}
+                  canPrev={usersDirectoryPagination.canPrev}
+                  canNext={usersDirectoryPagination.canNext}
+                  onPrev={usersDirectoryPagination.goPrev}
+                  onNext={usersDirectoryPagination.goNext}
+                />
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -344,6 +733,52 @@ export default function SuperadminPage() {
             <h2>Audit Trail</h2>
             <span className="muted">Superadmin Access</span>
           </div>
+
+          <div className="audit-filter-row">
+            <div>
+              <label htmlFor="audit-from-date">From Date</label>
+              <input
+                id="audit-from-date"
+                type="date"
+                value={auditFromDate}
+                onChange={(e) => setAuditFromDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="audit-to-date">To Date</label>
+              <input
+                id="audit-to-date"
+                type="date"
+                value={auditToDate}
+                onChange={(e) => setAuditToDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="audit-user">User</label>
+              <select id="audit-user" value={auditUser} onChange={(e) => setAuditUser(e.target.value)}>
+                <option value="">All Users</option>
+                {auditUsers.map((username) => (
+                  <option key={username} value={username}>{username}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="audit-action">Action</label>
+              <select id="audit-action" value={auditAction} onChange={(e) => setAuditAction(e.target.value)}>
+                <option value="">All Actions</option>
+                {auditActions.map((action) => (
+                  <option key={action} value={action}>{action}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="action-cell">
+            <button type="button" className="ghost-btn" onClick={openAuditPreview}>
+              Preview Audit Trail
+            </button>
+          </div>
+
           <div className="table-wrap tall-scroll">
             <table>
               <thead>
@@ -354,7 +789,12 @@ export default function SuperadminPage() {
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
+                {filteredLogs.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="muted">No audit logs match the selected filters.</td>
+                  </tr>
+                )}
+                {auditPagination.paginatedItems.map((log) => (
                   <tr key={log._id}>
                     <td>{new Date(log.createdAt).toLocaleString()}</td>
                     <td>{log.actorId?.username || 'System'}</td>
@@ -364,10 +804,43 @@ export default function SuperadminPage() {
               </tbody>
             </table>
           </div>
+          <TablePager
+            page={auditPagination.page}
+            totalPages={auditPagination.totalPages}
+            totalItems={auditPagination.totalItems}
+            canPrev={auditPagination.canPrev}
+            canNext={auditPagination.canNext}
+            onPrev={auditPagination.goPrev}
+            onNext={auditPagination.goNext}
+          />
         </div>
       )}
 
       {error && <p className="error">{error}</p>}
+
+      <PrintReportPreviewModal
+        open={auditPreviewOpen}
+        title="Audit Trail Preview"
+        subtitle="Review before download or print"
+        onClose={() => setAuditPreviewOpen(false)}
+        fileName={auditPreviewFileName}
+        pdfDocument={auditPreviewDocument}
+        downloadLabel="Download Audit Trail PDF"
+        reportType="audit_trail"
+        onDownloadLogged={refreshAuditLogs}
+      />
+
+      <PrintReportPreviewModal
+        open={usersPreviewOpen}
+        title="All Users PDF Preview"
+        subtitle="Review before download or print"
+        onClose={() => setUsersPreviewOpen(false)}
+        fileName={usersPreviewFileName}
+        pdfDocument={usersPreviewDocument}
+        downloadLabel="Download Users Directory PDF"
+        reportType="users_directory"
+        onDownloadLogged={refreshAuditLogs}
+      />
     </section>
   );
 }

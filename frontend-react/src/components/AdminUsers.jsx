@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminCreateUser, fetchPendingUsers, fetchUsers, updateUserApproval } from '../api';
+import usePagination from '../hooks/usePagination';
+import TablePager from './TablePager';
 
 export default function AdminUsers({
   token,
@@ -18,11 +20,36 @@ export default function AdminUsers({
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const pendingPagination = usePagination(pendingUsers, 10);
+  const directoryPagination = usePagination(allUsers, 10);
+
   const loadUsers = async () => {
     try {
-      const [pending, all] = await Promise.all([fetchPendingUsers(token), fetchUsers(token)]);
-      setPendingUsers(pending);
-      setAllUsers(all);
+      const tasks = [];
+
+      if (showApproval) {
+        tasks.push(fetchPendingUsers(token));
+      }
+
+      if (showDirectory) {
+        tasks.push(fetchUsers(token));
+      }
+
+      const results = await Promise.all(tasks);
+      let index = 0;
+
+      if (showApproval) {
+        setPendingUsers(results[index] || []);
+        index += 1;
+      } else {
+        setPendingUsers([]);
+      }
+
+      if (showDirectory) {
+        setAllUsers(results[index] || []);
+      } else {
+        setAllUsers([]);
+      }
     } catch (err) {
       setError(err.message);
     }
@@ -94,7 +121,7 @@ export default function AdminUsers({
                     <td colSpan={4} className="muted">No pending users.</td>
                   </tr>
                 )}
-                {pendingUsers.map((user) => (
+                {pendingPagination.paginatedItems.map((user) => (
                   <tr key={user._id}>
                     <td>{user.username}</td>
                     <td>{user.role}</td>
@@ -121,6 +148,15 @@ export default function AdminUsers({
               </tbody>
             </table>
           </div>
+          <TablePager
+            page={pendingPagination.page}
+            totalPages={pendingPagination.totalPages}
+            totalItems={pendingPagination.totalItems}
+            canPrev={pendingPagination.canPrev}
+            canNext={pendingPagination.canNext}
+            onPrev={pendingPagination.goPrev}
+            onNext={pendingPagination.goNext}
+          />
         </>
       )}
 
@@ -154,6 +190,7 @@ export default function AdminUsers({
             <select id="admin-create-role" value={role} onChange={(e) => setRole(e.target.value)}>
               <option value="tallier">Tallier</option>
               <option value="tabulator">Tabulator</option>
+              <option value="grievancecommittee">Grievance Committee</option>
               {allowAdmin && <option value="admin">Admin</option>}
               {allowSuperadmin && <option value="superadmin">Superadmin</option>}
             </select>
@@ -182,7 +219,12 @@ export default function AdminUsers({
                 </tr>
               </thead>
               <tbody>
-                {allUsers.map((user) => (
+                {allUsers.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="muted">No users found.</td>
+                  </tr>
+                )}
+                {directoryPagination.paginatedItems.map((user) => (
                   <tr key={user._id || user.id}>
                     <td>{user.username}</td>
                     <td>{user.role}</td>
@@ -193,6 +235,15 @@ export default function AdminUsers({
               </tbody>
             </table>
           </div>
+          <TablePager
+            page={directoryPagination.page}
+            totalPages={directoryPagination.totalPages}
+            totalItems={directoryPagination.totalItems}
+            canPrev={directoryPagination.canPrev}
+            canNext={directoryPagination.canNext}
+            onPrev={directoryPagination.goPrev}
+            onNext={directoryPagination.goNext}
+          />
         </>
       )}
 

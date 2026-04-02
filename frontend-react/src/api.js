@@ -1,4 +1,31 @@
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+function resolveApiBase() {
+  const configured = process.env.REACT_APP_API_URL;
+  const hasWindow = typeof window !== 'undefined';
+  const hostname = hasWindow ? window.location.hostname : 'localhost';
+  const protocol = hasWindow ? window.location.protocol : 'http:';
+  const fallback = `${protocol}//${hostname}:5000/api`;
+
+  if (!configured) {
+    return fallback;
+  }
+
+  try {
+    const parsed = new URL(configured);
+    const isLoopbackConfig = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    const isLoopbackCurrent = hostname === 'localhost' || hostname === '127.0.0.1';
+
+    if (isLoopbackConfig && !isLoopbackCurrent) {
+      parsed.hostname = hostname;
+      return parsed.toString().replace(/\/$/, '');
+    }
+
+    return configured;
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+const API_BASE = resolveApiBase();
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, options);
@@ -90,6 +117,17 @@ export function fetchContestants(eventId, token) {
   });
 }
 
+export function fileContestantGrievance(contestantId, body, token) {
+  return request(`/contestants/${contestantId}/deduct`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(body)
+  });
+}
+
 export function createContestant(body, token) {
   return request('/contestants', {
     method: 'POST',
@@ -129,6 +167,17 @@ export function fetchEventUnlockStatus(eventId, token) {
   });
 }
 
+export function patchEventStatus(eventId, eventStatus, token) {
+  return request(`/events/${eventId}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ eventStatus })
+  });
+}
+
 export function fetchEventTallies(eventId, token) {
   return request(`/tallies/event/${eventId}`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -143,6 +192,18 @@ export function submitTally(body, token) {
       Authorization: `Bearer ${token}`
     },
     body: JSON.stringify(body)
+  });
+}
+
+export function fetchTallierScoreSheet(eventId, token) {
+  return request(`/tallies/mine/${eventId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function fetchMasterEventResults(eventId, token) {
+  return request(`/tallies/master/${eventId}`, {
+    headers: { Authorization: `Bearer ${token}` }
   });
 }
 
@@ -171,4 +232,65 @@ export function fetchPublicLeaderboard(category = '', eventId = '') {
 
   const query = params.toString();
   return request(`/public/leaderboard${query ? `?${query}` : ''}`);
+}
+
+export async function fetchAdminBackup(token) {
+  const response = await fetch(`${API_BASE}/admin/backup`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!response.ok) {
+    const fallback = `HTTP ${response.status} ${response.statusText}`;
+    throw new Error(fallback);
+  }
+
+  return response.blob();
+}
+
+export function fetchApprovedUsersByRole(role, token) {
+  const params = new URLSearchParams();
+  params.set('role', role);
+
+  return request(`/assignments/users?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function assignEventTabulator(eventId, tabulatorId, token) {
+  return request(`/assignments/events/${eventId}/tabulator`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ tabulatorId })
+  });
+}
+
+export function assignEventTalliers(eventId, assignedTallierIds, token) {
+  return request(`/assignments/events/${eventId}/talliers`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ assignedTallierIds })
+  });
+}
+
+export function fetchTabulatorAssignmentSummary(token) {
+  return request('/assignments/tabulator/dashboard', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function logPdfDownload(reportType, eventId, token) {
+  return request('/admin/log-pdf-download', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ reportType, eventId })
+  });
 }
