@@ -2,11 +2,12 @@ import usePagination from '../hooks/usePagination';
 import TablePager from './TablePager';
 
 export default function ResultTable({ rankings }) {
-  if (!rankings || rankings.length === 0) {
+  const safeRankings = rankings ?? [];
+  const rankingsPagination = usePagination(safeRankings, 10);
+
+  if (safeRankings.length === 0) {
     return <p className="muted">No rankings yet.</p>;
   }
-
-  const rankingsPagination = usePagination(rankings, 10);
 
   return (
     <>

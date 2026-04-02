@@ -1,5 +1,7 @@
 function resolveApiBase() {
-  const configured = process.env.REACT_APP_API_URL;
+  const configured =
+    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
+    (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL);
   const hasWindow = typeof window !== 'undefined';
   const hostname = hasWindow ? window.location.hostname : 'localhost';
   const protocol = hasWindow ? window.location.protocol : 'http:';

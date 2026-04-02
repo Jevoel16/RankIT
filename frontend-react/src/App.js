@@ -1,16 +1,16 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
-import Navbar from './components/Navbar';
-import ProtectedRouter from './components/ProtectedRouter';
+import Navbar from './components/Navbar.jsx';
+import ProtectedRouter from './components/ProtectedRouter.jsx';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
-import LoginPage from './pages/LoginPage';
-import TallierPage from './pages/TallierPage';
-import TabulatorPage from './pages/TabulatorPage';
-import AdminPage from './pages/AdminPage';
-import SuperadminPage from './pages/SuperadminPage';
-import CommunityHome from './pages/CommunityHome';
-import GrievancePage from './pages/GrievancePage';
+import LoginPage from './pages/LoginPage.jsx';
+import TallierPage from './pages/TallierPage.jsx';
+import TabulatorPage from './pages/TabulatorPage.jsx';
+import AdminPage from './pages/AdminPage.jsx';
+import SuperadminPage from './pages/SuperadminPage.jsx';
+import CommunityHome from './pages/CommunityHome.jsx';
+import GrievancePage from './pages/GrievancePage.jsx';
 
 function App() {
   const { isAuthenticated, user } = useAuth();
