@@ -46,6 +46,13 @@ app.use('/api/public', publicRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/assignments', assignmentRoutes);
 
+app.get('/', (req, res) => {
+    res.status(200).json({
+        message: 'RankIT backend is running',
+        api: '/api'
+    });
+});
+
 app.get('/api', (req, res) => {
     res.json({ message: 'RankIT API is running' });
 });
