@@ -33,12 +33,12 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'username and password are required.' });
     }
 
-    const allowedSelfRegisterRoles = ['tallier', 'tabulator', 'grievancecommittee'];
-    const requestedRole = role || 'tallier';
+    const allowedSelfRegisterRoles = ['tabulator', 'grievance'];
+    const requestedRole = role || 'tabulator';
 
     if (!allowedSelfRegisterRoles.includes(requestedRole)) {
       return res.status(403).json({
-        message: 'Only tallier, tabulator, and grievancecommittee roles can register directly. Admin accounts are created by superadmin.'
+        message: 'Only tabulator and grievance roles can register directly. Admin accounts are created by superadmin.'
       });
     }
 
@@ -155,7 +155,7 @@ const getPendingUsers = async (req, res) => {
     if (req.user.role === 'superadmin') {
       allowedRoles = ['admin'];
     } else if (req.user.role === 'admin') {
-      allowedRoles = ['tallier', 'tabulator'];
+      allowedRoles = ['tabulator'];
     }
 
     const users = await User.find({
@@ -187,7 +187,7 @@ const updateApproval = async (req, res) => {
     const approverRole = req.user.role;
     const canSuperadminApprove = approverRole === 'superadmin' && targetUser.role === 'admin';
     const canAdminApprove =
-      approverRole === 'admin' && ['tallier', 'tabulator'].includes(targetUser.role);
+      approverRole === 'admin' && ['tabulator'].includes(targetUser.role);
 
     if (!canSuperadminApprove && !canAdminApprove) {
       return res.status(403).json({
@@ -235,6 +235,10 @@ const adminCreateUser = async (req, res) => {
 
     if (role === 'admin' && req.user.role !== 'superadmin') {
       return res.status(403).json({ message: 'Only superadmin can create admin accounts.' });
+    }
+
+    if (!['tabulator', 'grievance', 'admin'].includes(role)) {
+      return res.status(403).json({ message: 'Only tabulator, grievance, and admin accounts can be created here.' });
     }
 
     if (role === 'superadmin') {

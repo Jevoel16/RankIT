@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   fetchContestants,
   fetchEvents,
-  fetchEventTallies,
+  fetchEventScores,
   fileContestantGrievance
 } from '../api';
 import { useAuth } from '../hooks/useAuth';
@@ -11,6 +11,7 @@ import TablePager from '../components/TablePager';
 
 export default function GrievancePage() {
   const { token } = useAuth();
+  const [activeTab, setActiveTab] = useState('grieve');
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [rankings, setRankings] = useState([]);
@@ -38,7 +39,7 @@ export default function GrievancePage() {
     }
 
     const [rankingData, contestantData] = await Promise.all([
-      fetchEventTallies(eventId, token),
+      fetchEventScores(eventId, token),
       fetchContestants(eventId, token)
     ]);
 
@@ -50,8 +51,9 @@ export default function GrievancePage() {
     async function init() {
       try {
         const data = await fetchEvents(token);
-        setEvents(data || []);
-        const firstEventId = data?.[0]?._id || '';
+        const specialEvents = (data || []).filter((item) => item?.category === 'Special Events Category');
+        setEvents(specialEvents);
+        const firstEventId = specialEvents?.[0]?._id || '';
         setSelectedEventId(firstEventId);
         await loadDashboardData(firstEventId);
       } catch (err) {
@@ -114,73 +116,86 @@ export default function GrievancePage() {
   };
 
   return (
-    <section className="panel stack">
-      <div className="section-head">
-        <h2>Grievance Dashboard</h2>
-        <span className="muted">View preliminary scores and apply deductions</span>
+    <section className="admin-workspace">
+      <div className="admin-tabs" role="tablist" aria-label="Grievance Sections">
+        <button
+          type="button"
+          className={`tab-btn ${activeTab === 'grieve' ? 'active' : ''}`}
+          onClick={() => setActiveTab('grieve')}
+        >
+          Grieve
+        </button>
       </div>
 
-      <label htmlFor="grievance-event">Event</label>
-      <select
-        id="grievance-event"
-        value={selectedEventId}
-        onChange={(e) => setSelectedEventId(e.target.value)}
-      >
-        {events.map((event) => (
-          <option key={event._id} value={event._id}>
-            {event.name}
-          </option>
-        ))}
-      </select>
+      <section className="panel stack">
 
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Contestant</th>
-              <th>Raw Avg</th>
-              <th>Deductions</th>
-              <th>Final Score</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rankings.length === 0 && (
-              <tr>
-                <td colSpan={6} className="muted">No rankings available for this event.</td>
-              </tr>
-            )}
-            {rankingsPagination.paginatedItems.map((row, index) => (
-              <tr key={row.contestantId || `${row.contestantName}-${index}`}>
-                <td>{(rankingsPagination.page - 1) * rankingsPagination.pageSize + index + 1}</td>
-                <td>{row.contestantName}</td>
-                <td>{row.rawAverageScore ?? row.averageScore}</td>
-                <td>{row.deductionPoints ?? 0}</td>
-                <td>{row.finalScore ?? row.averageScore}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="ghost-btn"
-                    onClick={() => openModal(row.contestantId)}
-                  >
-                    File Grievance
-                  </button>
-                </td>
-              </tr>
+      {activeTab === 'grieve' && (
+        <>
+          <label htmlFor="grievance-event">Special Event</label>
+          <select
+            id="grievance-event"
+            value={selectedEventId}
+            onChange={(e) => setSelectedEventId(e.target.value)}
+            disabled={events.length === 0}
+          >
+            {events.length === 0 && <option value="">No special events available</option>}
+            {events.map((event) => (
+              <option key={event._id} value={event._id}>
+                {event.name}
+              </option>
             ))}
-          </tbody>
-        </table>
-      </div>
-      <TablePager
-        page={rankingsPagination.page}
-        totalPages={rankingsPagination.totalPages}
-        totalItems={rankingsPagination.totalItems}
-        canPrev={rankingsPagination.canPrev}
-        canNext={rankingsPagination.canNext}
-        onPrev={rankingsPagination.goPrev}
-        onNext={rankingsPagination.goNext}
-      />
+          </select>
+
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Contestant</th>
+                  <th>Raw Avg</th>
+                  <th>Deductions</th>
+                  <th>Final Score</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rankings.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="muted">No rankings available for this event.</td>
+                  </tr>
+                )}
+                {rankingsPagination.paginatedItems.map((row, index) => (
+                  <tr key={row.contestantId || `${row.contestantName}-${index}`}>
+                    <td>{(rankingsPagination.page - 1) * rankingsPagination.pageSize + index + 1}</td>
+                    <td>{row.contestantName}</td>
+                    <td>{row.rawAverageScore ?? row.averageScore}</td>
+                    <td>{row.deductionPoints ?? 0}</td>
+                    <td>{row.finalScore ?? row.averageScore}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        onClick={() => openModal(row.contestantId)}
+                      >
+                        File Grievance
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <TablePager
+            page={rankingsPagination.page}
+            totalPages={rankingsPagination.totalPages}
+            totalItems={rankingsPagination.totalItems}
+            canPrev={rankingsPagination.canPrev}
+            canNext={rankingsPagination.canNext}
+            onPrev={rankingsPagination.goPrev}
+            onNext={rankingsPagination.goNext}
+          />
+        </>
+      )}
 
       {error && <p className="error">{error}</p>}
       {success && <p className="success">{success}</p>}
@@ -227,6 +242,7 @@ export default function GrievancePage() {
           </div>
         </div>
       )}
+      </section>
     </section>
   );
 }

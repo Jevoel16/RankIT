@@ -18,7 +18,7 @@ const auditSchema = new mongoose.Schema(
         },
         entityType: {
             type: String,
-            enum: ['event', 'user', 'tally', 'contestant', 'system'],
+            enum: ['event', 'user', 'scoreSheet', 'contestant', 'system'],
             required: [true, 'Entity type is required']
         },
         entityId: {

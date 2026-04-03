@@ -1,11 +1,24 @@
 import { useState } from 'react';
 import { patchEventStatus } from '../api';
 
-export default function FinalizeEventModal({ open, eventName, eventId, requiredTalliers, completedTalliers, onClose, onSuccess, token }) {
+export default function FinalizeEventModal({
+  open,
+  eventName,
+  eventId,
+  requiredJudges,
+  completedJudges,
+  requiredTalliers,
+  completedTalliers,
+  onClose,
+  onSuccess,
+  token
+}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const totalRequiredJudges = Number(requiredJudges ?? requiredTalliers ?? 0);
+  const totalCompletedJudges = Number(completedJudges ?? completedTalliers ?? 0);
 
-  const canFinalize = completedTalliers >= requiredTalliers;
+  const canFinalize = totalCompletedJudges >= totalRequiredJudges;
 
   const handleFinalize = async () => {
     setError('');
@@ -46,11 +59,11 @@ export default function FinalizeEventModal({ open, eventName, eventId, requiredT
 
           <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid var(--accent)' }}>
             <p style={{ margin: '4px 0', fontSize: '13px', color: 'rgba(255, 255, 255, 0.8)' }}>
-              <strong>Tallier Submissions:</strong> {completedTalliers} of {requiredTalliers} required
+              <strong>Judge Submissions:</strong> {totalCompletedJudges} of {totalRequiredJudges} required
             </p>
             {!canFinalize && (
               <p style={{ margin: '4px 0', fontSize: '12px', color: '#f59e0b' }}>
-                ⚠️ Not all required talliers have submitted scores. Finalization is currently disabled.
+                ⚠️ Not all required judges have submitted scores. Finalization is currently disabled.
               </p>
             )}
           </div>

@@ -5,13 +5,14 @@ const path = require('path');
 const connectDB = require('./config/db');
 const userRoutes = require('./routes/userRoutes');
 const eventRoutes = require('./routes/eventRoutes');
-const tallyRoutes = require('./routes/tallyRoutes');
+const scoresRoutes = require('./routes/scoresRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const contestantRoutes = require('./routes/contestantRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const publicRoutes = require('./routes/publicRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const assignmentRoutes = require('./routes/assignmentRoutes');
+const rankingRoutes = require('./routes/rankingRoutes');
 
 dotenv.config();
 
@@ -38,13 +39,14 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);
-app.use('/api/tallies', tallyRoutes);
+app.use('/api/scores', scoresRoutes);
 app.use('/api/audits', auditRoutes);
 app.use('/api/contestants', contestantRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/assignments', assignmentRoutes);
+app.use('/api/rankings', rankingRoutes);
 
 app.get('/', (req, res) => {
     res.status(200).json({

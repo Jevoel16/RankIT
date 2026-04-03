@@ -11,11 +11,14 @@ RankIT is a role-based event tabulation platform built with React, Express, and 
 - **Event Finalization & Winner Declaration** with comprehensive audit logging
 - Hierarchical assignment flow (Admin -> Tabulator -> Tallier)
 - Event and contestant management
+- Literary event support with set-based scoring for debate-style competitions
+- Tabulator-managed offline score recording with physical judge attribution
+- Hierarchical weighted ranking (category totals + overall weighted champion)
 - Audit trail and analytics dashboards
 - Admin JSON backup download
 - Full-contestant Master Results PDF for tabulator/admin verification
 - Deduction Notes PDF as separate sub-tab for detailed audit records
-- Grievance Committee dashboard with audited deduction actions
+- Grievance dashboard with audited deduction actions
 - Vercel-ready frontend deployment setup
 
 ## Project Architecture
@@ -30,17 +33,21 @@ RankIT is a role-based event tabulation platform built with React, Express, and 
 
 - Public route at /
 - No login required for audience access
+- Unified control bubble for switching Event, Category, and Overall rankings
 - Top-3 podium with medal crown visuals
-- Category and event filtering
-- Live status badge (LIVE or FINAL)
+- Category and event filtering in the same control panel
+- Live status badge (LIVE or ENDED)
 - Real-time feel via periodic refresh
+- Category and overall tabs can be opened/locked by admin settings
+- Event list includes only events marked visible to the community
 
 ### Staff Modules
 
-- Tallier: submit scores per contestant and criteria
-- Tabulator: view progress, rankings, and assign judges (talliers) to their event
-- Grievance Committee: view preliminary scores and apply contestant point deductions with reasons
+- Tabulator: record offline scores per contestant and criteria with physical judge attribution
+- Tabulator: view progress, rankings, and assign judges to their event
+- Grievance: view preliminary scores and apply contestant point deductions with reasons
 - Admin: create events, assign tabulators via a dedicated tab, manage contestants/users, and download JSON backups
+- Admin: configure community access (event visibility, live/ended event status, category/overall ranking locks)
 - Superadmin: approval flow, analytics, audits, and system oversight
 
 ### Hierarchical Assignment Workflow
@@ -57,7 +64,28 @@ RankIT is a role-based event tabulation platform built with React, Express, and 
 - One-click backup download from Admin Settings
 - Master PDF report route: /api/tallies/master/:eventId with audit action FULL_RESULTS_PDF_GENERATED
 - Grievance deduction route: /api/contestants/:id/deduct with audit action SCORE_ALTERED_BY_GRIEVANCE
+- Overall weighted ranking calculation is audit-logged as OVERALL_RANKINGS_CALCULATED
 - Project context paragraph provided in ProjectContext.md
+
+### Hierarchical Ranking Logic
+
+- Category ranking: contestant final event scores are summed within a category to produce category totals.
+- Overall ranking: each event rank is converted to weighted points using 1st=10, 2nd=7, 3rd=5, 4th=3, 5th=2, 6th=1, 7th=0.
+- Overall champion: weighted points are summed across all events and categories.
+- Public home now includes separate tabs for event, category, and overall rankings.
+
+### Ranking Endpoints
+
+- GET /api/rankings/category/:categoryName (authenticated roles: admin, superadmin, tabulator, grievance)
+- GET /api/rankings/overall (authenticated roles: admin, superadmin, tabulator, grievance)
+- GET /api/public/rankings/category/:categoryName (public; availability controlled by admin lock setting)
+- GET /api/public/overall-leaderboard (public)
+
+### Community Access Endpoints
+
+- GET /api/admin/community-access (admin/superadmin)
+- PATCH /api/admin/community-access (admin/superadmin)
+- PATCH /api/admin/community-access/events/:eventId (admin/superadmin)
 
 ### Security and Governance
 
@@ -92,7 +120,7 @@ JWT_EXPIRES_IN=12h
 Frontend file: frontend-react/.env
 
 ```env
-REACT_APP_API_URL=http://localhost:5000/api
+VITE_API_URL=http://localhost:5000/api
 ```
 
 ### 3. Seed Initial Users (Optional)
@@ -110,25 +138,24 @@ Default password: 1234
 - tallier1
 - pending1
 
-### 3.1 Seed Dummy Events + Contestants + Users (Optional)
+### 3.1 Seed Events + Contestants (Optional)
 
 ```bash
-npm run seed:dummy --prefix backend
+npm run seed:events --prefix backend
 ```
 
 This seeds:
 
-- 3 events: Dancing Showdown, Singing Idol, Talent Showcase
-- 10 contestants per event (30 total)
-- 6 approved demo users (password for all: 1234)
-	- includes grievance committee role account
-	- superadmin_demo
-	- admin_demo
-	- tabulator_demo
-	- grievance_demo
-	- tallier_dance
-	- tallier_sing
-	- tallier_talent
+- Events and contestants only (no user seeding)
+- Categories: Special Events Category, Literary Events Category, Sports Events Category
+- Literary includes both Debate Showcase and Poetry Recitation
+- Sports uses two-team setup (CCS vs CSM)
+
+Run users seeding first so tabulator assignments are available:
+
+```bash
+npm run seed:users --prefix backend
+```
 
 ### 4. Run in Development
 
@@ -165,7 +192,7 @@ If the app works on your PC but fails on phone/other laptop, use LAN settings in
 1. Set frontend API URL to your machine IP in frontend-react/.env:
 
 ```env
-REACT_APP_API_URL=http://YOUR_PC_LAN_IP:5000/api
+VITE_API_URL=http://YOUR_PC_LAN_IP:5000/api
 ```
 
 If this remains set to localhost, the app now auto-switches localhost to the current device host when accessed from another device.

@@ -11,8 +11,8 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true }, // Hashed
   role: {
     type: String,
-    enum: ['tallier', 'tabulator', 'grievancecommittee', 'admin', 'superadmin'],
-    default: 'tallier'
+    enum: ['tabulator', 'grievance', 'admin', 'superadmin'],
+    default: 'tabulator'
   },
   isApproved: {
     type: Boolean,

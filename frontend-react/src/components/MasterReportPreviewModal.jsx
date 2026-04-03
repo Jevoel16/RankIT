@@ -4,9 +4,11 @@ import { useAuth } from '../hooks/useAuth';
 import { logPdfDownload } from '../api';
 import FullResultsPDF from './FullResultsPDF';
 import DeductionNotesPDF from './DeductionNotesPDF';
+import WeightedRankingsPDF from './WeightedRankingsPDF';
 
 export default function MasterReportPreviewModal({ open, reportData, onClose, onDownloadLogged }) {
   const { token } = useAuth();
+  const isSportsEvent = Boolean(reportData?.isSportsEvent);
   const [activeTab, setActiveTab] = useState('main');
 
   const mainReportDocument = useMemo(
@@ -16,6 +18,11 @@ export default function MasterReportPreviewModal({ open, reportData, onClose, on
 
   const deductionNotesDocument = useMemo(
     () => (reportData ? <DeductionNotesPDF reportData={reportData} /> : null),
+    [reportData]
+  );
+
+  const weightedRankingsDocument = useMemo(
+    () => (reportData ? <WeightedRankingsPDF reportData={reportData} /> : null),
     [reportData]
   );
 
@@ -35,11 +42,18 @@ export default function MasterReportPreviewModal({ open, reportData, onClose, on
     return null;
   }
 
-  const displayDocument = activeTab === 'main' ? mainReportDocument : deductionNotesDocument;
+  const effectiveTab = isSportsEvent ? 'main' : activeTab;
+
+  const displayDocument = effectiveTab === 'main'
+    ? mainReportDocument
+    : effectiveTab === 'deduction'
+      ? deductionNotesDocument
+      : weightedRankingsDocument;
   const mainReportFileName = `${String(reportData.eventName || 'event').replace(/\s+/g, '_')}_master_results.pdf`;
   const deductionNotesFileName = `${String(reportData.eventName || 'event').replace(/\s+/g, '_')}_deduction_notes.pdf`;
-  const fileName = activeTab === 'main' ? mainReportFileName : deductionNotesFileName;
-  const reportType = activeTab === 'main' ? 'master_report' : 'deduction_notes';
+  const weightedRankingFileName = `${String(reportData.eventName || 'event').replace(/\s+/g, '_')}_weighted_rankings.pdf`;
+  const fileName = effectiveTab === 'main' ? mainReportFileName : effectiveTab === 'deduction' ? deductionNotesFileName : weightedRankingFileName;
+  const reportType = effectiveTab === 'main' ? 'master_report' : effectiveTab === 'deduction' ? 'deduction_notes' : 'weighted_rankings';
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
@@ -56,18 +70,29 @@ export default function MasterReportPreviewModal({ open, reportData, onClose, on
         <div className="report-tabs">
           <button
             type="button"
-            className={`tab-button ${activeTab === 'main' ? 'active' : ''}`}
+            className={`tab-button ${effectiveTab === 'main' ? 'active' : ''}`}
             onClick={() => setActiveTab('main')}
           >
             Main Report
           </button>
-          <button
-            type="button"
-            className={`tab-button ${activeTab === 'deduction' ? 'active' : ''}`}
-            onClick={() => setActiveTab('deduction')}
-          >
-            Deduction Notes
-          </button>
+          {!isSportsEvent && (
+            <>
+              <button
+                type="button"
+                className={`tab-button ${effectiveTab === 'deduction' ? 'active' : ''}`}
+                onClick={() => setActiveTab('deduction')}
+              >
+                Deduction Notes
+              </button>
+              <button
+                type="button"
+                className={`tab-button ${effectiveTab === 'weighted' ? 'active' : ''}`}
+                onClick={() => setActiveTab('weighted')}
+              >
+                Weighted Ranking
+              </button>
+            </>
+          )}
         </div>
 
         <div className="pdf-preview-viewer-wrap">

@@ -60,7 +60,7 @@ const authorize = (...allowedRoles) => {
 const authorizeEventAssignment = ({
   eventIdSource = 'params',
   allowAdminRoles = ['admin', 'superadmin'],
-  allowedAssignedRoles = ['tabulator', 'tallier']
+  allowedAssignedRoles = ['tabulator']
 } = {}) => {
   return async (req, res, next) => {
     try {
@@ -89,12 +89,7 @@ const authorizeEventAssignment = ({
       const userId = req.user._id.toString();
       const isAssignedTabulator =
         req.user.role === 'tabulator' && event.tabulatorId && event.tabulatorId.toString() === userId;
-      const isAssignedTallier =
-        req.user.role === 'tallier' &&
-        Array.isArray(event.assignedTallierIds) &&
-        event.assignedTallierIds.some((id) => id.toString() === userId);
-
-      if (!isAssignedTabulator && !isAssignedTallier) {
+      if (!isAssignedTabulator) {
         return res.status(403).json({ message: 'Forbidden: not assigned to this event.' });
       }
 

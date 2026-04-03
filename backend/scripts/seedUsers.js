@@ -7,12 +7,15 @@ const User = require('../models/User');
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const usersToSeed = [
-  { username: 'superadmin1', role: 'superadmin', isApproved: true, approvalStatus: 'approved' },
-  { username: 'admin1', role: 'admin', isApproved: true, approvalStatus: 'approved' },
-  { username: 'tabulator1', role: 'tabulator', isApproved: true, approvalStatus: 'approved' },
-  { username: 'tallier1', role: 'tallier', isApproved: true, approvalStatus: 'approved' },
-  { username: 'grievance1', role: 'grievancecommittee', isApproved: true, approvalStatus: 'approved' },
-  { username: 'pending1', role: 'tallier', isApproved: false, approvalStatus: 'pending' }
+  { username: 'jevoel', role: 'superadmin', isApproved: true, approvalStatus: 'approved' },
+  { username: 'mark', role: 'admin', isApproved: true, approvalStatus: 'approved' },
+  { username: 'al', role: 'tabulator', isApproved: true, approvalStatus: 'approved' },
+  { username: 'kibra', role: 'grievance', isApproved: true, approvalStatus: 'approved' },
+  { username: 'jheo', role: 'tabulator', isApproved: true, approvalStatus: 'approved' },
+  { username: 'quinit', role: 'tabulator', isApproved: true, approvalStatus: 'pending' },
+  { username: 'francis', role: 'tabulator', isApproved: true, approvalStatus: 'pending' },
+  { username: 'phil', role: 'tabulator', isApproved: true, approvalStatus: 'pending' },
+  { username: 'rossmir', role: 'tabulator', isApproved: false, approvalStatus: 'pending' }
 ];
 
 async function seedUsers() {

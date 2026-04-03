@@ -9,7 +9,7 @@
     "dev": "nodemon server.js",
     "start:dev": "set NODE_ENV=development&& nodemon server.js",
     "seed:users": "node scripts/seedUsers.js",
-    "seed:dummy": "node scripts/seedDummyData.js"
+    "seed:events": "node scripts/seedEvents.js"
   },
   "keywords": [],
   "author": "",

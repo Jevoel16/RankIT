@@ -6,9 +6,8 @@ export default function Navbar() {
   const location = useLocation();
 
   const links = [
-    user?.role === 'tallier' && { to: '/tallier', label: 'Scoring' },
-    user?.role === 'tabulator' && { to: '/tabulator', label: 'Progress Dashboard' },
-    user?.role === 'grievancecommittee' && { to: '/grievance', label: 'Grievance Dashboard' },
+    (user?.role === 'tallier' || user?.role === 'tabulator') && { to: '/tabulator', label: 'Tabulation' },
+    user?.role === 'grievance' && { to: '/grievance', label: 'Grievance Configuration' },
     user?.role === 'admin' && { to: '/admin', label: 'Event Configuration' },
     user?.role === 'superadmin' && { to: '/superadmin', label: 'Superadmin Console' }
   ].filter(Boolean);
@@ -29,7 +28,7 @@ export default function Navbar() {
           ))}
         </div>
         <div className="nav-meta">
-          <span className="role-pill">{user?.role}</span>
+          <span className="role-pill">{user?.username || user?.name || user?.role}</span>
           <button onClick={logout} className="ghost-btn" type="button">
             Logout
           </button>

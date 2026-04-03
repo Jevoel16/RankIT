@@ -15,7 +15,7 @@ export default function AdminUsers({
   const [allUsers, setAllUsers] = useState([]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('tallier');
+  const [role, setRole] = useState('tabulator');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -86,7 +86,7 @@ export default function AdminUsers({
       setSuccess('User created and approved successfully.');
       setUsername('');
       setPassword('');
-      setRole('tallier');
+      setRole('tabulator');
       await loadUsers();
     } catch (err) {
       setError(err.message);
@@ -188,9 +188,8 @@ export default function AdminUsers({
 
             <label htmlFor="admin-create-role">Role</label>
             <select id="admin-create-role" value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="tallier">Tallier</option>
               <option value="tabulator">Tabulator</option>
-              <option value="grievancecommittee">Grievance Committee</option>
+              <option value="grievance">Grievance</option>
               {allowAdmin && <option value="admin">Admin</option>}
               {allowSuperadmin && <option value="superadmin">Superadmin</option>}
             </select>

@@ -10,7 +10,17 @@ const eventSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Event Category is required'],
         trim: true,
-        lowercase: true
+        enum: ['Special Events Category', 'Literary Events Category', 'Sports Events Category']
+    },
+    scoringMode: {
+        type: String,
+        enum: ['criteria', 'sets'],
+        default: 'criteria'
+    },
+    setCount: {
+        type: Number,
+        min: [1, 'Set count must be at least 1'],
+        default: null
     },
     criteria: [{
         label: {
@@ -54,6 +64,10 @@ const eventSchema = new mongoose.Schema({
         enum: ['scheduled', 'live', 'finalized'],
         default: 'scheduled'
     },
+    communityVisible: {
+        type: Boolean,
+        default: true
+    },
     finalizedAt: {
         type: Date,
         default: null
@@ -87,6 +101,13 @@ const eventSchema = new mongoose.Schema({
 
 eventSchema.pre('validate', function(next) {
     const totalWeight = (this.criteria || []).reduce((sum, item) => sum + Number(item.weight || 0), 0);
+    const scoringMode = this.scoringMode || 'criteria';
+
+    if (scoringMode === 'sets') {
+        if (!Number.isFinite(Number(this.setCount)) || Number(this.setCount) < 1) {
+            this.invalidate('setCount', 'Set count is required for set-based events.');
+        }
+    }
 
     if (Math.abs(totalWeight - 100) > 0.0001) {
         this.invalidate('criteria', 'Total criteria weight must equal 100%.');

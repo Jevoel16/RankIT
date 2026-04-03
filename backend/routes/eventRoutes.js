@@ -13,16 +13,16 @@ const { authenticate, authorize, authorizeEventAssignment } = require('../middle
 
 router
     .route('/')
-    .get(authenticate, authorize('admin', 'tabulator', 'tallier', 'grievancecommittee'), getEvents)
+    .get(authenticate, authorize('admin', 'tabulator', 'tallier', 'grievance'), getEvents)
     .post(authenticate, authorize('admin'), createEvent);
 
 router
     .route('/:id')
-    .get(authenticate, authorize('admin', 'tabulator', 'tallier', 'grievancecommittee'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'superadmin', 'grievancecommittee'] }), getEvent)
+    .get(authenticate, authorize('admin', 'tabulator', 'tallier', 'grievance'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'superadmin', 'grievance'] }), getEvent)
     .put(authenticate, authorize('admin'), updateEvent)
     .delete(authenticate, authorize('admin'), deleteEvent);
 
-router.get('/:id/unlock-status', authenticate, authorize('admin', 'tabulator', 'tallier', 'grievancecommittee'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'superadmin', 'grievancecommittee'] }), getEventUnlockStatus);
+router.get('/:id/unlock-status', authenticate, authorize('admin', 'tabulator', 'tallier', 'grievance'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'superadmin', 'grievance'] }), getEventUnlockStatus);
 
 router.patch('/:eventId/status', authenticate, authorize('admin'), patchEventStatus);
 

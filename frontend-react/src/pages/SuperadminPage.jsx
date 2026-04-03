@@ -98,7 +98,7 @@ function EventSubmissionsGraph({ rows }) {
         <span className="muted">Vertical Bar Graph</span>
       </div>
       {safeRows.length === 0 ? (
-        <p className="muted">No event tally data available yet.</p>
+        <p className="muted">No event submission data available yet.</p>
       ) : (
         <div className="vbar-chart-wrap">
           <div className="vbar-chart">
@@ -392,9 +392,8 @@ export default function SuperadminPage() {
   const groupedUsers = useMemo(
     () => ({
       admin: allUsers.filter((user) => user.role === 'admin'),
-      tallier: allUsers.filter((user) => user.role === 'tallier'),
       tabulator: allUsers.filter((user) => user.role === 'tabulator'),
-      grievancecommittee: allUsers.filter((user) => user.role === 'grievancecommittee')
+      grievance: allUsers.filter((user) => user.role === 'grievance')
     }),
     [allUsers]
   );
@@ -655,8 +654,7 @@ export default function SuperadminPage() {
                     <option value="superadmin">superadmin</option>
                     <option value="admin">admin</option>
                     <option value="tabulator">tabulator</option>
-                    <option value="tallier">tallier</option>
-                    <option value="grievancecommittee">grievancecommittee</option>
+                    <option value="grievance">grievance</option>
                   </select>
                 </div>
                 <div>

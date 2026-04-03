@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { register as registerRequest } from '../api';
 
@@ -11,19 +12,17 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('tallier');
+  const [role, setRole] = useState('tabulator');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   if (isAuthenticated) {
     const to =
-      user?.role === 'tallier'
-        ? '/tallier'
-        : user?.role === 'tabulator'
-          ? '/tabulator'
-          : user?.role === 'grievancecommittee'
-            ? '/grievance'
+      user?.role === 'tabulator'
+        ? '/tabulator'
+        : user?.role === 'grievance'
+          ? '/grievance'
           : user?.role === 'superadmin'
             ? '/superadmin'
             : '/admin';
@@ -51,19 +50,16 @@ export default function LoginPage() {
         const payload = await login(username, password);
         const from = location.state?.from || '';
         const rolePath =
-          payload.user.role === 'tallier'
-            ? '/tallier'
-            : payload.user.role === 'tabulator'
-              ? '/tabulator'
-              : payload.user.role === 'grievancecommittee'
-                ? '/grievance'
+          payload.user.role === 'tabulator'
+            ? '/tabulator'
+            : payload.user.role === 'grievance'
+              ? '/grievance'
               : payload.user.role === 'superadmin'
                 ? '/superadmin'
-              : '/admin';
+                : '/admin';
 
         const canUseFrom =
-          (payload.user.role === 'tallier' && from.startsWith('/tally/')) ||
-          (payload.user.role === 'tabulator' && from.startsWith('/tabulate/'));
+          payload.user.role === 'tabulator' && from.startsWith('/tabulate/');
 
         navigate(canUseFrom ? from : rolePath, { replace: true });
       }
@@ -76,8 +72,10 @@ export default function LoginPage() {
 
   return (
     <main className="auth-shell">
-      <form className="auth-card" onSubmit={onSubmit}>
-        <h1>RankIT Access</h1>
+      <Link to="/" className="community-brand auth-brand-link" aria-label="Go to community rankings">
+        RankIT
+      </Link>
+      <div className="auth-panel-stack">
         <div className="sub-tabs" role="tablist" aria-label="Authentication Mode">
           <button
             type="button"
@@ -102,11 +100,7 @@ export default function LoginPage() {
             Register
           </button>
         </div>
-        <p className="muted">
-          {mode === 'register'
-            ? 'Create a tallier, tabulator, or grievance committee account. Approval is required before login.'
-            : 'Sign in with your role-based domain account.'}
-        </p>
+        <form className="auth-card" onSubmit={onSubmit}>
         <label htmlFor="username">Username</label>
         <input
           id="username"
@@ -118,7 +112,7 @@ export default function LoginPage() {
         />
         {mode === 'login' && (
           <small style={{ color: 'rgba(255,255,255,0.6)', marginTop: '-6px', marginBottom: '8px', display: 'block' }}>
-            Format: username@role.rankit (e.g., john@tallier.rankit)
+            Format: username@role.rankit (e.g., john@tabulator.rankit)
           </small>
         )}
         <label htmlFor="password">Password</label>
@@ -144,9 +138,8 @@ export default function LoginPage() {
 
             <label htmlFor="register-role">Role</label>
             <select id="register-role" value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="tallier">Tallier (Judge)</option>
-              <option value="tabulator">Tabulator (Gatekeeper)</option>
-              <option value="grievancecommittee">Grievance Committee</option>
+              <option value="tabulator">Tabulator</option>
+              <option value="grievance">Grievance</option>
             </select>
             <small style={{ color: 'rgba(255,255,255,0.6)', marginTop: '-8px', marginBottom: '8px', display: 'block' }}>
               Your username will be formatted as: <strong>your_name@{role}.rankit</strong>
@@ -158,7 +151,8 @@ export default function LoginPage() {
         <button type="submit" disabled={loading}>
           {loading ? (mode === 'register' ? 'Submitting...' : 'Signing in...') : mode === 'register' ? 'Register' : 'Login'}
         </button>
-      </form>
+        </form>
+      </div>
     </main>
   );
 }

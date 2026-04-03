@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const Event = require('../models/Event');
 const Contestant = require('../models/Contestant');
-const Tally = require('../models/Tally');
+const ScoreSheet = require('../models/ScoreSheet');
 const Audit = require('../models/Audit');
 
 const getOverview = async (_req, res) => {
@@ -24,14 +24,14 @@ const getOverview = async (_req, res) => {
       User.countDocuments({ approvalStatus: 'rejected' }),
       Event.countDocuments(),
       Contestant.countDocuments(),
-      Tally.countDocuments(),
+      ScoreSheet.countDocuments(),
       Audit.countDocuments(),
       User.aggregate([
         { $group: { _id: '$role', count: { $sum: 1 } } },
         { $project: { _id: 0, role: '$_id', count: 1 } },
         { $sort: { role: 1 } }
       ]),
-      Tally.aggregate([
+      ScoreSheet.aggregate([
         {
           $group: {
             _id: '$eventId',

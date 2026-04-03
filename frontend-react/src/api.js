@@ -180,14 +180,14 @@ export function patchEventStatus(eventId, eventStatus, token) {
   });
 }
 
-export function fetchEventTallies(eventId, token) {
-  return request(`/tallies/event/${eventId}`, {
+export function fetchMasterEventResults(eventId, token) {
+  return request(`/scores/master/${eventId}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 }
 
-export function submitTally(body, token) {
-  return request('/tallies', {
+export function recordOfflineScore(body, token) {
+  return request('/scores/record', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -197,15 +197,18 @@ export function submitTally(body, token) {
   });
 }
 
-export function fetchTallierScoreSheet(eventId, token) {
-  return request(`/tallies/mine/${eventId}`, {
+export function fetchEventScores(eventId, token) {
+  return request(`/scores/event/${eventId}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 }
 
-export function fetchMasterEventResults(eventId, token) {
-  return request(`/tallies/master/${eventId}`, {
-    headers: { Authorization: `Bearer ${token}` }
+export function generateSportsTop4Pairings(eventId, token) {
+  return request(`/scores/sports/${encodeURIComponent(eventId)}/top4-pairings`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
   });
 }
 
@@ -234,6 +237,26 @@ export function fetchPublicLeaderboard(category = '', eventId = '') {
 
   const query = params.toString();
   return request(`/public/leaderboard${query ? `?${query}` : ''}`);
+}
+
+export function fetchPublicOverallLeaderboard() {
+  return request('/public/overall-leaderboard');
+}
+
+export function fetchPublicCategoryRankings(categoryName) {
+  return request(`/public/rankings/category/${encodeURIComponent(categoryName)}`);
+}
+
+export function fetchCategoryRankings(categoryName, token) {
+  return request(`/rankings/category/${encodeURIComponent(categoryName)}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function fetchOverallRankings(token) {
+  return request('/rankings/overall', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
 }
 
 export async function fetchAdminBackup(token) {
@@ -269,23 +292,6 @@ export function assignEventTabulator(eventId, tabulatorId, token) {
   });
 }
 
-export function assignEventTalliers(eventId, assignedTallierIds, token) {
-  return request(`/assignments/events/${eventId}/talliers`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify({ assignedTallierIds })
-  });
-}
-
-export function fetchTabulatorAssignmentSummary(token) {
-  return request('/assignments/tabulator/dashboard', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-}
-
 export function logPdfDownload(reportType, eventId, token) {
   return request('/admin/log-pdf-download', {
     method: 'POST',
@@ -294,5 +300,33 @@ export function logPdfDownload(reportType, eventId, token) {
       Authorization: `Bearer ${token}`
     },
     body: JSON.stringify({ reportType, eventId })
+  });
+}
+
+export function fetchCommunityAccess(token) {
+  return request('/admin/community-access', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export function updateCommunityAccess(body, token) {
+  return request('/admin/community-access', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(body)
+  });
+}
+
+export function updateCommunityEventAccess(eventId, body, token) {
+  return request(`/admin/community-access/events/${encodeURIComponent(eventId)}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(body)
   });
 }

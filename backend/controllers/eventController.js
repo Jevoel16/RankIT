@@ -1,9 +1,31 @@
 const Event = require('../models/Event');
-const Tally = require('../models/Tally');
+const ScoreSheet = require('../models/ScoreSheet');
 const Audit = require('../models/Audit');
 const User = require('../models/User');
 
 let attemptedLegacyCategoryIndexDrop = false;
+
+const buildSetCriteria = ({ eventName, setCount }) => {
+    const parsedSetCount = Math.max(1, Number(setCount) || 1);
+    const baseWeight = Math.floor(10000 / parsedSetCount) / 100;
+    const criteria = [];
+
+    for (let index = 0; index < parsedSetCount; index += 1) {
+        const isLast = index === parsedSetCount - 1;
+        const weight = isLast ? Number((100 - baseWeight * (parsedSetCount - 1)).toFixed(2)) : baseWeight;
+
+        criteria.push({
+            label: `Set ${index + 1}`,
+            description: `${String(eventName || 'Event').trim()} set ${index + 1}`,
+            maxScore: 25,
+            weight
+        });
+    }
+
+    return criteria;
+};
+
+const normalizeScoringMode = (value) => (String(value || '').toLowerCase() === 'sets' ? 'sets' : 'criteria');
 
 const writeAudit = async ({ action, actorId, eventId, entityType, entityId, metadata }) => {
     try {
@@ -50,8 +72,8 @@ const computeGatekeeperState = async (eventId) => {
     const event = await Event.findById(eventId);
     if (!event) return null;
 
-    const tallierIds = await Tally.distinct('tallierId', { eventId });
-    const currentTallies = tallierIds.length;
+    const judgeNames = await ScoreSheet.distinct('physicalJudgeName', { eventId });
+    const currentTallies = judgeNames.length;
     const unlocked = currentTallies >= event.requiredTalliers;
 
     event.completedTalliers = currentTallies;
@@ -105,15 +127,35 @@ const getEvent = async (req, res) => {
 const createEvent = async (req, res) => {
     try {
         const normalizedTallierIds = normalizeObjectIdList(req.body.assignedTallierIds);
+        const scoringMode = normalizeScoringMode(req.body.scoringMode);
+        const eventName = String(req.body.name || '').trim();
+        const requestedSetCount = Number(req.body.setCount || 0);
 
         await validateAssignments({
             tabulatorId: req.body.tabulatorId,
             assignedTallierIds: normalizedTallierIds
         });
 
+        const generatedCriteria = scoringMode === 'sets'
+            ? (req.body.criteria && Array.isArray(req.body.criteria) && req.body.criteria.length > 0)
+                ? req.body.criteria.map((item) => ({
+                    label: item.label || `Set ${req.body.criteria.indexOf(item) + 1}`,
+                    description: item.description || `${String(eventName || 'Event').trim()} set ${req.body.criteria.indexOf(item) + 1}`,
+                    maxScore: Number(item.maxScore) || 25,
+                    weight: Number(item.weight) || 0
+                }))
+                : buildSetCriteria({
+                    eventName,
+                    setCount: requestedSetCount || 5
+                })
+            : (req.body.criteria || []).filter((item) => item && item.label && Number(item.weight) > 0);
+
         const payload = {
             ...req.body,
-            criteria: (req.body.criteria || []).filter((item) => item && item.label && Number(item.weight) > 0),
+            scoringMode,
+            sportName: '',
+            setCount: scoringMode === 'sets' ? (requestedSetCount || generatedCriteria.length) : null,
+            criteria: generatedCriteria,
             tabulatorId: req.body.tabulatorId || null,
             assignedTallierIds: normalizedTallierIds
         };
@@ -126,7 +168,7 @@ const createEvent = async (req, res) => {
             return res.status(400).json({ message: 'Event category is required.' });
         }
 
-        if (!Array.isArray(payload.criteria) || payload.criteria.length === 0) {
+        if (scoringMode !== 'sets' && (!Array.isArray(payload.criteria) || payload.criteria.length === 0)) {
             return res.status(400).json({ message: 'At least one valid criterion is required.' });
         }
 
@@ -204,6 +246,30 @@ const updateEvent = async (req, res) => {
             return res.status(404).json({ message: 'Event not found.' });
         }
 
+        const nextScoringMode = normalizeScoringMode(
+            Object.prototype.hasOwnProperty.call(req.body, 'scoringMode') ? req.body.scoringMode : existing.scoringMode
+        );
+        const nextEventName = Object.prototype.hasOwnProperty.call(req.body, 'name')
+            ? String(req.body.name || '').trim()
+            : String(existing.name || '').trim();
+        const nextSetCount = Object.prototype.hasOwnProperty.call(req.body, 'setCount')
+            ? Number(req.body.setCount || 0)
+            : Number(existing.setCount || 0);
+        const nextCriteria = nextScoringMode === 'sets'
+            ? (Object.prototype.hasOwnProperty.call(req.body, 'criteria') && Array.isArray(req.body.criteria) && req.body.criteria.length > 0)
+                ? req.body.criteria.map((item) => ({
+                    label: item.label || `Set ${req.body.criteria.indexOf(item) + 1}`,
+                    description: item.description || `${String(nextEventName || 'Event').trim()} set ${req.body.criteria.indexOf(item) + 1}`,
+                    maxScore: Number(item.maxScore) || 25,
+                    weight: Number(item.weight) || 0
+                }))
+                : buildSetCriteria({ eventName: nextEventName, setCount: nextSetCount || 5 })
+            : (Object.prototype.hasOwnProperty.call(req.body, 'criteria')
+                ? (req.body.criteria || []).filter((item) => item && item.label && Number(item.weight) > 0)
+                : Array.isArray(existing.criteria) && existing.criteria.length > 0
+                    ? existing.criteria
+                    : []);
+
         const nextTabulatorId = Object.prototype.hasOwnProperty.call(req.body, 'tabulatorId')
             ? (req.body.tabulatorId || null)
             : existing.tabulatorId;
@@ -217,6 +283,10 @@ const updateEvent = async (req, res) => {
         });
 
         Object.assign(existing, req.body);
+        existing.scoringMode = nextScoringMode;
+        existing.sportName = '';
+        existing.setCount = nextScoringMode === 'sets' ? (nextSetCount || nextCriteria.length || 5) : null;
+        existing.criteria = nextCriteria;
         existing.tabulatorId = nextTabulatorId;
         existing.assignedTallierIds = nextAssignedTallierIds;
         const updated = await existing.save();
@@ -312,7 +382,7 @@ const patchEventStatus = async (req, res) => {
         // Additional checks for finalization
         if (eventStatus === 'finalized') {
             // Verify gatekeeper logic is satisfied (all required talliers submitted)
-            const tallyCount = await Tally.distinct('tallierId', { eventId });
+            const tallyCount = await ScoreSheet.distinct('physicalJudgeName', { eventId });
             if (tallyCount.length < event.requiredTalliers) {
                 return res.status(400).json({ 
                     message: `Cannot finalize: Only ${tallyCount.length} of ${event.requiredTalliers} required talliers have submitted.` 

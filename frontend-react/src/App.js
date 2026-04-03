@@ -5,7 +5,6 @@ import ProtectedRouter from './components/ProtectedRouter.jsx';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import LoginPage from './pages/LoginPage.jsx';
-import TallierPage from './pages/TallierPage.jsx';
 import TabulatorPage from './pages/TabulatorPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
 import SuperadminPage from './pages/SuperadminPage.jsx';
@@ -16,11 +15,9 @@ function App() {
   const { isAuthenticated, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const homePath =
-    user?.role === 'tallier'
-      ? '/tallier'
-      : user?.role === 'tabulator'
+    user?.role === 'tabulator'
         ? '/tabulator'
-        : user?.role === 'grievancecommittee'
+        : user?.role === 'grievance'
           ? '/grievance'
         : user?.role === 'superadmin'
           ? '/superadmin'
@@ -51,22 +48,6 @@ function App() {
           <Route path="/" element={<CommunityHome />} />
           <Route path="/login" element={<LoginPage />} />
           <Route
-            path="/tallier"
-            element={
-              <ProtectedRouter roles={['tallier']}>
-                <TallierPage />
-              </ProtectedRouter>
-            }
-          />
-          <Route
-            path="/tally/:eventId"
-            element={
-              <ProtectedRouter roles={['tallier']}>
-                <TallierPage />
-              </ProtectedRouter>
-            }
-          />
-          <Route
             path="/tabulator"
             element={
               <ProtectedRouter roles={['tabulator']}>
@@ -85,7 +66,7 @@ function App() {
           <Route
             path="/grievance"
             element={
-              <ProtectedRouter roles={['grievancecommittee']}>
+              <ProtectedRouter roles={['grievance']}>
                 <GrievancePage />
               </ProtectedRouter>
             }
