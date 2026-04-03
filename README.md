@@ -71,7 +71,7 @@ RankIT is a role-based event tabulation platform built with React, Express, and 
 
 - Category ranking: contestant final event scores are summed within a category to produce category totals.
 - Overall ranking: each event rank is converted to weighted points using 1st=10, 2nd=7, 3rd=5, 4th=3, 5th=2, 6th=1, 7th=0.
-- Overall champion: weighted points are summed across all events and categories.
+- Overall champion: category points are averaged across the categories a contestant appears in using `(sum of category points) / number of categories`.
 - Public home now includes separate tabs for event, category, and overall rankings.
 
 ### Ranking Endpoints
