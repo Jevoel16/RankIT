@@ -405,7 +405,7 @@ export default function AdminPage() {
       {activeTab === 'events' && (
         <div className="tab-content-shell">
           <div className="panel tab-content-panel">
-          <div className="sub-tabs" role="tablist" aria-label="Event Configuration Actions">
+          <div className="sub-tabs event-config-subtabs" role="tablist" aria-label="Event Configuration Actions">
             <button
               type="button"
               className={`subtab-btn ${eventSubtab === 'create-event' ? 'active' : ''}`}
@@ -430,7 +430,7 @@ export default function AdminPage() {
           </div>
 
           {eventSubtab === 'create-event' && (
-            <div className="panel stack">
+            <div className="panel stack create-event-panel">
               <div className="section-head">
                 <h3>{isSetBasedCategory ? 'Create Sports Event' : 'Create Event'}</h3>
               </div>
@@ -500,7 +500,7 @@ export default function AdminPage() {
                           </span>
                         </div>
                         {criteria.map((criterion, index) => (
-                          <div className="criteria-row" key={index}>
+                          <div className="criteria-row create-event-criteria-row" key={index}>
                             <input
                               value={criterion.label}
                               onChange={(e) => updateCriterion(index, 'label', e.target.value)}

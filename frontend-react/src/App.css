@@ -1961,6 +1961,98 @@ td.action-cell {
     grid-template-columns: 1fr 1fr;
   }
 
+  .event-config-subtabs,
+  .user-oversight-subtabs {
+    grid-template-columns: 1fr;
+  }
+
+  .user-oversight-subtabs {
+    margin: 0;
+    width: 100%;
+  }
+
+  .event-config-subtabs .subtab-btn,
+  .user-oversight-subtabs .subtab-btn {
+    width: 100%;
+    text-align: left;
+  }
+
+  .create-event-panel .create-event-criteria-row {
+    grid-template-columns: 1fr;
+  }
+
+  .superadmin-users-directory .action-cell {
+    align-items: stretch;
+  }
+
+  .superadmin-users-directory .action-cell .ghost-btn {
+    width: 100%;
+  }
+
+  .superadmin-users-directory {
+    padding: 16px;
+  }
+
+  .superadmin-users-directory .table-wrap {
+    overflow-x: auto;
+  }
+
+  .superadmin-users-directory th,
+  .superadmin-users-directory td {
+    padding: 8px;
+    font-size: 0.92rem;
+  }
+
+  .superadmin-users-directory .users-directory-table {
+    min-width: 0;
+  }
+
+  .superadmin-users-directory .users-directory-table thead {
+    display: none;
+  }
+
+  .superadmin-users-directory .users-directory-table tbody {
+    display: grid;
+    gap: 8px;
+  }
+
+  .superadmin-users-directory .users-directory-table tbody tr {
+    display: grid;
+    gap: 4px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    background: rgba(8, 13, 20, 0.45);
+  }
+
+  .superadmin-users-directory .users-directory-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 0;
+    text-align: left;
+    padding: 4px 0;
+    word-break: break-word;
+  }
+
+  .superadmin-users-directory .users-directory-table tbody td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-weight: 700;
+    flex: 0 0 92px;
+  }
+
+  .superadmin-users-directory .users-directory-table .users-empty-cell {
+    display: block;
+    text-align: center;
+    padding: 10px 6px;
+  }
+
+  .superadmin-users-directory .users-directory-table .users-empty-cell::before {
+    content: none;
+  }
+
   .auth-panel-stack {
     margin-top: -10px;
   }

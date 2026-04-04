@@ -520,7 +520,7 @@ export default function SuperadminPage() {
             <h2>User Oversight</h2>
           </div>
 
-          <div className="sub-tabs" role="tablist" aria-label="User Oversight Features">
+          <div className="sub-tabs user-oversight-subtabs" role="tablist" aria-label="User Oversight Features">
             <button
               type="button"
               className={`subtab-btn ${userSubtab === 'approval' ? 'active' : ''}`}
@@ -563,7 +563,7 @@ export default function SuperadminPage() {
             />
           )}
           {userSubtab === 'users' && (
-            <div className="panel stack">
+            <div className="panel stack superadmin-users-directory">
               <div className="section-head">
                 <h3>Users Directory</h3>
               </div>
@@ -619,7 +619,7 @@ export default function SuperadminPage() {
                   <h3>All Users</h3>
                 </div>
                 <div className="table-wrap">
-                  <table>
+                  <table className="users-directory-table">
                     <thead>
                       <tr>
                         <th>Username</th>
@@ -631,15 +631,15 @@ export default function SuperadminPage() {
                     <tbody>
                       {filteredUsersRows.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="muted">No users match the selected filters.</td>
+                          <td colSpan={4} className="muted users-empty-cell">No users match the selected filters.</td>
                         </tr>
                       )}
                       {usersDirectoryPagination.paginatedItems.map((user) => (
                         <tr key={user._id || user.id}>
-                          <td>{user.username}</td>
-                          <td>{user.role}</td>
-                          <td>{user.isApproved ? 'Yes' : 'No'}</td>
-                          <td>{user.approvalStatus || (user.isApproved ? 'approved' : 'pending')}</td>
+                          <td data-label="Username">{user.username}</td>
+                          <td data-label="Role">{user.role}</td>
+                          <td data-label="Approved">{user.isApproved ? 'Yes' : 'No'}</td>
+                          <td data-label="Status">{user.approvalStatus || (user.isApproved ? 'approved' : 'pending')}</td>
                         </tr>
                       ))}
                     </tbody>
