@@ -28,7 +28,7 @@ It has:
 - Manage user approvals and manual user creation
 - Create events (including criteria-based and sports flows)
 - Assign tabulators to events
-- Manage contestants
+- Manage contestants with dedicated Add Contestants and Update Contestants views
 - Control community visibility/settings
 
 ### Superadmin

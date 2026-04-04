@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fetchAnalyticsOverview, fetchAuditLogs, fetchUsers } from '../api';
 import { useAuth } from '../hooks/useAuth';
 import AdminUsers from '../components/AdminUsers';
@@ -200,7 +200,7 @@ export default function SuperadminPage() {
   const [auditPreviewOpen, setAuditPreviewOpen] = useState(false);
   const [error, setError] = useState('');
 
-  const hasHydratedRef = useRef(false);
+  const [storageReady, setStorageReady] = useState(false);
 
   const actorKey = useMemo(
     () => user?.id || user?._id || user?.username || 'superadmin',
@@ -268,6 +268,8 @@ export default function SuperadminPage() {
       return;
     }
 
+    setStorageReady(false);
+
     try {
       const saved = localStorage.getItem(stateStorageKey);
       if (saved) {
@@ -285,12 +287,12 @@ export default function SuperadminPage() {
     } catch (_error) {
       // Ignore malformed storage.
     } finally {
-      hasHydratedRef.current = true;
+      setStorageReady(true);
     }
   }, [stateStorageKey]);
 
   useEffect(() => {
-    if (!hasHydratedRef.current) {
+    if (!storageReady) {
       return;
     }
 
@@ -313,6 +315,7 @@ export default function SuperadminPage() {
       // Ignore storage failures.
     }
   }, [
+    storageReady,
     stateStorageKey,
     activeTab,
     userSubtab,
@@ -326,21 +329,21 @@ export default function SuperadminPage() {
   ]);
 
   useEffect(() => {
-    if (!hasHydratedRef.current) {
+    if (!storageReady) {
       return;
     }
     recordUserAction('active_tab_changed', activeTab);
-  }, [activeTab]);
+  }, [storageReady, activeTab]);
 
   useEffect(() => {
-    if (!hasHydratedRef.current) {
+    if (!storageReady) {
       return;
     }
     recordUserAction('user_subtab_changed', userSubtab);
-  }, [userSubtab]);
+  }, [storageReady, userSubtab]);
 
   useEffect(() => {
-    if (!hasHydratedRef.current) {
+    if (!storageReady) {
       return;
     }
     recordUserAction('users_filter_updated', {
@@ -348,10 +351,10 @@ export default function SuperadminPage() {
       role: usersRoleFilter,
       status: usersStatusFilter
     });
-  }, [usersSearch, usersRoleFilter, usersStatusFilter]);
+  }, [storageReady, usersSearch, usersRoleFilter, usersStatusFilter]);
 
   useEffect(() => {
-    if (!hasHydratedRef.current) {
+    if (!storageReady) {
       return;
     }
     recordUserAction('audit_filter_updated', {
@@ -360,7 +363,7 @@ export default function SuperadminPage() {
       user: auditUser,
       action: auditAction
     });
-  }, [auditFromDate, auditToDate, auditUser, auditAction]);
+  }, [storageReady, auditFromDate, auditToDate, auditUser, auditAction]);
 
   const groupedUsers = useMemo(
     () => ({

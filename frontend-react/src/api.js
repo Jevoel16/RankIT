@@ -141,6 +141,17 @@ export function createContestant(body, token) {
   });
 }
 
+export function updateContestant(contestantId, body, token) {
+  return request(`/contestants/${encodeURIComponent(contestantId)}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(body)
+  });
+}
+
 export function bulkCreateContestants(body, token) {
   return request('/contestants/bulk', {
     method: 'POST',

@@ -16,6 +16,25 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [storageReady, setStorageReady] = useState(false);
+
+  const stateStorageKey = 'rankit_login_state';
+  const actionsStorageKey = 'rankit_login_actions';
+
+  const recordUserAction = (actionType, value) => {
+    try {
+      const saved = localStorage.getItem(actionsStorageKey);
+      const history = saved ? JSON.parse(saved) : [];
+      history.push({
+        actionType,
+        value,
+        timestamp: new Date().toISOString()
+      });
+      localStorage.setItem(actionsStorageKey, JSON.stringify(history.slice(-200)));
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+  };
 
   useEffect(() => {
     document.body.classList.add('auth-page-lock');
@@ -23,6 +42,57 @@ export default function LoginPage() {
       document.body.classList.remove('auth-page-lock');
     };
   }, []);
+
+  useEffect(() => {
+    setStorageReady(false);
+
+    try {
+      const saved = localStorage.getItem(stateStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setMode(parsed.mode === 'register' ? 'register' : 'login');
+        setUsername(parsed.username || '');
+        setRole(parsed.role === 'grievance' ? 'grievance' : 'tabulator');
+      }
+    } catch (_error) {
+      // Ignore malformed storage.
+    } finally {
+      setStorageReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        stateStorageKey,
+        JSON.stringify({
+          mode,
+          username,
+          role
+        })
+      );
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+  }, [storageReady, mode, username, role]);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+    recordUserAction('auth_mode_changed', mode);
+  }, [storageReady, mode]);
+
+  useEffect(() => {
+    if (!storageReady || mode !== 'register') {
+      return;
+    }
+    recordUserAction('register_role_selected', role);
+  }, [storageReady, mode, role]);
 
   if (isAuthenticated) {
     const to =
@@ -50,10 +120,12 @@ export default function LoginPage() {
 
         const payload = await registerRequest({ username, password, role });
         setSuccess(payload?.message || 'Registration submitted. Pending Admin Approval.');
+        recordUserAction('register_submitted', { username: String(username || '').trim(), role });
         setMode('login');
         setPassword('');
         setConfirmPassword('');
       } else {
+        recordUserAction('login_submitted', { username: String(username || '').trim() });
         const payload = await login(username, password);
         const from = location.state?.from || '';
         const rolePath =

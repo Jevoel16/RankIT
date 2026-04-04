@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchContestants,
   fetchEvents,
@@ -12,7 +12,7 @@ import TablePager from '../components/TablePager';
 import MasterReportPreviewModal from '../components/MasterReportPreviewModal';
 
 export default function GrievancePage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [activeTab, setActiveTab] = useState('grieve');
   const [events, setEvents] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
@@ -28,6 +28,77 @@ export default function GrievancePage() {
   const [reportPreviewData, setReportPreviewData] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const [storageReady, setStorageReady] = useState(false);
+  const preferredEventIdRef = useRef('');
+  const actorKey = useMemo(() => user?.id || user?._id || user?.username || 'grievance', [user]);
+  const stateStorageKey = useMemo(() => `rankit_grievance_state_${actorKey}`, [actorKey]);
+  const actionsStorageKey = useMemo(() => `rankit_grievance_actions_${actorKey}`, [actorKey]);
+
+  const recordUserAction = (actionType, value) => {
+    try {
+      const saved = localStorage.getItem(actionsStorageKey);
+      const history = saved ? JSON.parse(saved) : [];
+      history.push({
+        actionType,
+        value,
+        timestamp: new Date().toISOString()
+      });
+      localStorage.setItem(actionsStorageKey, JSON.stringify(history.slice(-300)));
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+  };
+
+  useEffect(() => {
+    setStorageReady(false);
+
+    try {
+      const saved = localStorage.getItem(stateStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setActiveTab(parsed.activeTab || 'grieve');
+        preferredEventIdRef.current = parsed.selectedEventId || '';
+        setSelectedEventId(parsed.selectedEventId || '');
+      }
+    } catch (_error) {
+      // Ignore malformed storage.
+    } finally {
+      setStorageReady(true);
+    }
+  }, [stateStorageKey]);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        stateStorageKey,
+        JSON.stringify({
+          activeTab,
+          selectedEventId
+        })
+      );
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+  }, [storageReady, stateStorageKey, activeTab, selectedEventId]);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+    recordUserAction('active_tab_changed', activeTab);
+  }, [storageReady, activeTab]);
+
+  useEffect(() => {
+    if (!storageReady || !selectedEventId) {
+      return;
+    }
+    recordUserAction('special_event_selected', selectedEventId);
+  }, [storageReady, selectedEventId]);
 
   const rankingsPagination = usePagination(rankings, 10);
 
@@ -58,9 +129,12 @@ export default function GrievancePage() {
         const data = await fetchEvents(token);
         const specialEvents = (data || []).filter((item) => item?.category === 'Special Events Category');
         setEvents(specialEvents);
-        const firstEventId = specialEvents?.[0]?._id || '';
-        setSelectedEventId(firstEventId);
-        await loadDashboardData(firstEventId);
+        const preferredEventId = preferredEventIdRef.current;
+        const resolvedEventId = specialEvents.some((item) => item._id === preferredEventId)
+          ? preferredEventId
+          : (specialEvents?.[0]?._id || '');
+        setSelectedEventId(resolvedEventId);
+        await loadDashboardData(resolvedEventId);
       } catch (err) {
         setError(err.message);
       }
@@ -112,6 +186,11 @@ export default function GrievancePage() {
 
       await loadDashboardData(selectedEventId);
       setSuccess('Grievance filed and deduction applied.');
+      recordUserAction('grievance_filed', {
+        eventId: selectedEventId,
+        contestantId: targetContestantId,
+        deductionPoints: Number(deductionPoints)
+      });
       closeModal();
     } catch (err) {
       setError(err.message);

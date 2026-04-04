@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   assignEventTabulator,
   createEvent,
@@ -33,7 +33,7 @@ const buildSportCriteria = (setCount) => {
 const EVENT_CATEGORIES = ['Special Events Category', 'Literary Events Category', 'Sports Events Category'];
 
 export default function AdminPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [activeTab, setActiveTab] = useState('users');
   const [userSubtab, setUserSubtab] = useState('approval');
   const [eventSubtab, setEventSubtab] = useState('create-event');
@@ -63,6 +63,102 @@ export default function AdminPage() {
   ]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const [storageReady, setStorageReady] = useState(false);
+  const actorKey = useMemo(() => user?.id || user?._id || user?.username || 'admin', [user]);
+  const stateStorageKey = useMemo(() => `rankit_admin_state_${actorKey}`, [actorKey]);
+  const actionsStorageKey = useMemo(() => `rankit_admin_actions_${actorKey}`, [actorKey]);
+
+  const recordUserAction = (actionType, value) => {
+    try {
+      const saved = localStorage.getItem(actionsStorageKey);
+      const history = saved ? JSON.parse(saved) : [];
+      history.push({
+        actionType,
+        value,
+        timestamp: new Date().toISOString()
+      });
+      localStorage.setItem(actionsStorageKey, JSON.stringify(history.slice(-300)));
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+  };
+
+  useEffect(() => {
+    setStorageReady(false);
+
+    try {
+      const saved = localStorage.getItem(stateStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setActiveTab(parsed.activeTab || 'users');
+        setUserSubtab(parsed.userSubtab || 'approval');
+        setEventSubtab(parsed.eventSubtab || 'create-event');
+        setSettingsSubtab(parsed.settingsSubtab || 'system-backup');
+        setMasterReportEventId(parsed.masterReportEventId || '');
+      }
+    } catch (_error) {
+      // Ignore malformed storage.
+    } finally {
+      setStorageReady(true);
+    }
+  }, [stateStorageKey]);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        stateStorageKey,
+        JSON.stringify({
+          activeTab,
+          userSubtab,
+          eventSubtab,
+          settingsSubtab,
+          masterReportEventId
+        })
+      );
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+  }, [storageReady, stateStorageKey, activeTab, userSubtab, eventSubtab, settingsSubtab, masterReportEventId]);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+    recordUserAction('active_tab_changed', activeTab);
+  }, [storageReady, activeTab]);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+    recordUserAction('user_subtab_changed', userSubtab);
+  }, [storageReady, userSubtab]);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+    recordUserAction('event_subtab_changed', eventSubtab);
+  }, [storageReady, eventSubtab]);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+    recordUserAction('settings_subtab_changed', settingsSubtab);
+  }, [storageReady, settingsSubtab]);
+
+  useEffect(() => {
+    if (!storageReady || !masterReportEventId) {
+      return;
+    }
+    recordUserAction('master_report_event_selected', masterReportEventId);
+  }, [storageReady, masterReportEventId]);
 
   useEffect(() => {
     setError('');
@@ -626,7 +722,7 @@ export default function AdminPage() {
           )}
 
           {eventSubtab === 'contestants' && (
-            <AdminContestants token={token} />
+            <AdminContestants token={token} actorKey={actorKey} />
           )}
           </div>
         </div>

@@ -53,6 +53,52 @@ const createContestant = async (req, res) => {
   }
 };
 
+const updateContestant = async (req, res) => {
+  try {
+    const contestant = await Contestant.findById(req.params.id);
+    if (!contestant) {
+      return res.status(404).json({ message: 'Contestant not found.' });
+    }
+
+    const hasName = Object.prototype.hasOwnProperty.call(req.body, 'name');
+    const hasContestantNumber = Object.prototype.hasOwnProperty.call(req.body, 'contestantNumber');
+
+    if (!hasName && !hasContestantNumber) {
+      return res.status(400).json({ message: 'Provide name or contestantNumber to update.' });
+    }
+
+    if (hasName) {
+      const trimmedName = String(req.body.name || '').trim();
+      if (!trimmedName) {
+        return res.status(400).json({ message: 'name cannot be empty.' });
+      }
+      contestant.name = trimmedName;
+    }
+
+    if (hasContestantNumber) {
+      const rawNumber = req.body.contestantNumber;
+
+      if (rawNumber === null || rawNumber === '' || typeof rawNumber === 'undefined') {
+        contestant.contestantNumber = undefined;
+      } else {
+        const parsedNumber = Number(rawNumber);
+        if (!Number.isInteger(parsedNumber) || parsedNumber < 1) {
+          return res.status(400).json({ message: 'contestantNumber must be an integer of at least 1.' });
+        }
+        contestant.contestantNumber = parsedNumber;
+      }
+    }
+
+    await contestant.save();
+    return res.json(contestant);
+  } catch (error) {
+    if (error && error.code === 11000) {
+      return res.status(409).json({ message: 'Contestant number already exists for this event.' });
+    }
+    return res.status(400).json({ message: error.message });
+  }
+};
+
 const bulkCreateContestants = async (req, res) => {
   try {
     const { eventId, contestants } = req.body;
@@ -153,6 +199,7 @@ const deductContestantScore = async (req, res) => {
 module.exports = {
   getContestantsByEvent,
   createContestant,
+  updateContestant,
   bulkCreateContestants,
   deductContestantScore
 };
