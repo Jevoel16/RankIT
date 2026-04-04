@@ -810,6 +810,7 @@ const getMasterEventResults = async (req, res) => {
     return res.json({
       eventId: event._id,
       eventName: event.name,
+      category: event.category,
       criteria: criteriaLabels,
       finalized: Boolean(gatekeeper?.unlocked),
       requiredTalliers: event.requiredTalliers,

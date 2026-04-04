@@ -30,6 +30,7 @@ It has:
 - Assign tabulators to events
 - Manage contestants with dedicated Add Contestants and Update Contestants views
 - Control community visibility/settings
+- Generate Master Report Preview with Main Report, Deduction Notes, Overall Weighted Ranking, and Category Weighted Ranking tabs
 
 ### Superadmin
 
@@ -138,6 +139,14 @@ Expected local URLs:
 - Admin can create event and manage users
 - Superadmin can open Analytics, User Oversight, and Audit Trail
 - Tabulator can load assigned event scoring flow
+
+## Routing Notes
+
+- Primary role routes:
+  - `/tabulator`
+  - `/grievance`
+  - `/admin`
+  - `/superadmin`
 
 ## Common Issues
 

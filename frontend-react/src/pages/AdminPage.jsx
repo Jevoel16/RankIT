@@ -8,6 +8,7 @@ import {
   fetchEvents,
   fetchMasterEventResults,
   fetchOverallRankings,
+  fetchCategoryRankings,
   updateCommunityAccess,
   updateCommunityEventAccess,
   logPdfDownload
@@ -43,6 +44,7 @@ export default function AdminPage() {
   const [masterReportLoading, setMasterReportLoading] = useState(false);
   const [masterReportEventId, setMasterReportEventId] = useState('');
   const [reportPreviewData, setReportPreviewData] = useState(null);
+  const [categoryRankings, setCategoryRankings] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [name, setName] = useState('');
   const [category, setCategory] = useState(EVENT_CATEGORIES[0]);
@@ -369,11 +371,29 @@ export default function AdminPage() {
         fetchOverallRankings(token)
       ]);
 
-      setReportPreviewData({
+      const updatedReportData = {
         ...reportData,
         weightedRankings: overallData?.rankings || [],
         weightedPointsByRank: overallData?.weightedPointsByRank || {}
-      });
+      };
+
+      setReportPreviewData(updatedReportData);
+      setCategoryRankings(null);
+
+      // Fetch category rankings if category exists
+      if (reportData?.category) {
+        try {
+          const categoryData = await fetchCategoryRankings(reportData.category, token);
+          setCategoryRankings(categoryData);
+        } catch (categoryErr) {
+          // Category rankings fetch failed, but continue with main report
+          console.error('Failed to fetch category rankings:', categoryErr);
+          setCategoryRankings(null);
+        }
+      } else {
+        setCategoryRankings(null);
+      }
+
       setPreviewOpen(true);
       setSuccess('Master report preview ready.');
     } catch (err) {
@@ -887,6 +907,7 @@ export default function AdminPage() {
         reportData={reportPreviewData}
         viewerRole="admin"
         preferredTab="main"
+        categoryRankings={categoryRankings}
         onClose={() => setPreviewOpen(false)}
       />
     </section>

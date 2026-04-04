@@ -14,12 +14,13 @@ import GrievancePage from './pages/GrievancePage.jsx';
 function App() {
   const { isAuthenticated, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const normalizedRole = user?.role === 'tallier' ? 'tabulator' : user?.role;
   const homePath =
-    user?.role === 'tabulator'
+    normalizedRole === 'tabulator'
         ? '/tabulator'
-        : user?.role === 'grievance'
+        : normalizedRole === 'grievance'
           ? '/grievance'
-        : user?.role === 'superadmin'
+        : normalizedRole === 'superadmin'
           ? '/superadmin'
           : '/admin';
 
@@ -63,6 +64,8 @@ function App() {
               </ProtectedRouter>
             }
           />
+          <Route path="/tallier" element={<Navigate to="/tabulator" replace />} />
+          <Route path="/tallier/:eventId" element={<Navigate to="/tabulator" replace />} />
           <Route
             path="/grievance"
             element={

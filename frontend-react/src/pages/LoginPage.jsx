@@ -95,12 +95,13 @@ export default function LoginPage() {
   }, [storageReady, mode, role]);
 
   if (isAuthenticated) {
+    const normalizedRole = user?.role === 'tallier' ? 'tabulator' : user?.role;
     const to =
-      user?.role === 'tabulator'
+      normalizedRole === 'tabulator'
         ? '/tabulator'
-        : user?.role === 'grievance'
+        : normalizedRole === 'grievance'
           ? '/grievance'
-          : user?.role === 'superadmin'
+          : normalizedRole === 'superadmin'
             ? '/superadmin'
             : '/admin';
     return <Navigate to={to} replace />;
@@ -128,17 +129,18 @@ export default function LoginPage() {
         recordUserAction('login_submitted', { username: String(username || '').trim() });
         const payload = await login(username, password);
         const from = location.state?.from || '';
+        const normalizedRole = payload.user.role === 'tallier' ? 'tabulator' : payload.user.role;
         const rolePath =
-          payload.user.role === 'tabulator'
+          normalizedRole === 'tabulator'
             ? '/tabulator'
-            : payload.user.role === 'grievance'
+            : normalizedRole === 'grievance'
               ? '/grievance'
-              : payload.user.role === 'superadmin'
+              : normalizedRole === 'superadmin'
                 ? '/superadmin'
                 : '/admin';
 
         const canUseFrom =
-          payload.user.role === 'tabulator' && from.startsWith('/tabulate/');
+          normalizedRole === 'tabulator' && from.startsWith('/tabulate/');
 
         navigate(canUseFrom ? from : rolePath, { replace: true });
       }

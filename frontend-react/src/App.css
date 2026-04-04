@@ -77,6 +77,11 @@ body.auth-page-lock {
   background: #edf3fa;
 }
 
+:root[data-theme='light'] .contestants-subtab-bubble {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 255, 0.98));
+  border-color: #cbd8ea;
+}
+
 :root[data-theme='light'] .progress-track,
 :root[data-theme='light'] .hbar-track,
 :root[data-theme='light'] .vbar-track,

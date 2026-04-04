@@ -24,7 +24,11 @@ export default function Navbar() {
             <Link
               key={item.to}
               to={item.to}
-              className={location.pathname === item.to ? 'active' : ''}
+              className={
+                item.to === '/tabulator'
+                  ? (location.pathname === '/tabulator' || location.pathname.startsWith('/tabulate/') ? 'active' : '')
+                  : (location.pathname === item.to ? 'active' : '')
+              }
             >
               {item.label}
             </Link>

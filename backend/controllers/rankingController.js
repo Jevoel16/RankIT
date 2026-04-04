@@ -375,9 +375,11 @@ const calculateOverallRankings = async () => {
     const contenderKey = row.contenderKey;
     if (!totals.has(contenderKey)) {
       totals.set(contenderKey, {
+        contenderKey,
         contestantName: row.contestantName,
         weightedTotal: 0,
         categoryTotals: {},
+        categoryEventCounts: {},
         eventBreakdown: []
       });
     }
@@ -387,6 +389,7 @@ const calculateOverallRankings = async () => {
 
     current.weightedTotal += weightedPoints;
     current.categoryTotals[row.category] = Number((current.categoryTotals[row.category] || 0) + weightedPoints);
+    current.categoryEventCounts[row.category] = Number((current.categoryEventCounts[row.category] || 0) + 1);
     current.eventBreakdown.push({
       category: row.category,
       eventId: row.eventId,
@@ -406,7 +409,12 @@ const calculateOverallRankings = async () => {
       weightedTotal: Number(
         (
           Object.keys(item.categoryTotals).length > 0
-            ? Object.values(item.categoryTotals).reduce((sum, value) => sum + Number(value || 0), 0) / Object.keys(item.categoryTotals).length
+            ? Object.keys(item.categoryTotals).reduce((sum, categoryName) => {
+              const total = Number(item.categoryTotals[categoryName] || 0);
+              const eventsPlayed = Number(item.categoryEventCounts[categoryName] || 0);
+              const averageByCategory = eventsPlayed > 0 ? total / eventsPlayed : 0;
+              return sum + averageByCategory;
+            }, 0) / Object.keys(item.categoryTotals).length
             : 0
         ).toFixed(4)
       ),
@@ -424,7 +432,68 @@ const calculateOverallRankings = async () => {
       ...item
     }));
 
-  return rankings;
+  const categoryRankMap = new Map();
+
+  rankings.forEach((row) => {
+    Object.keys(row.categoryTotals || {}).forEach((categoryName) => {
+      if (!categoryRankMap.has(categoryName)) {
+        categoryRankMap.set(categoryName, []);
+      }
+
+      const total = Number(row.categoryTotals?.[categoryName] || 0);
+      const eventsPlayed = Number(row.categoryEventCounts?.[categoryName] || 0);
+      const avgWeightedPoints = eventsPlayed > 0 ? Number((total / eventsPlayed).toFixed(4)) : 0;
+
+      categoryRankMap.get(categoryName).push({
+        contenderKey: row.contenderKey,
+        contestantName: row.contestantName,
+        avgWeightedPoints
+      });
+    });
+  });
+
+  const categoryRankLookup = new Map();
+
+  categoryRankMap.forEach((rows, categoryName) => {
+    const sorted = [...rows].sort((a, b) => {
+      if (b.avgWeightedPoints !== a.avgWeightedPoints) return b.avgWeightedPoints - a.avgWeightedPoints;
+      return a.contestantName.localeCompare(b.contestantName);
+    });
+
+    let previousScore = null;
+    let currentRank = 0;
+
+    sorted.forEach((entry, index) => {
+      if (previousScore === null || entry.avgWeightedPoints !== previousScore) {
+        currentRank = index + 1;
+        previousScore = entry.avgWeightedPoints;
+      }
+
+      categoryRankLookup.set(`${categoryName}::${entry.contenderKey}`, {
+        categoryRank: currentRank,
+        avgWeightedPoints: entry.avgWeightedPoints
+      });
+    });
+  });
+
+  return rankings.map((row) => ({
+    ...row,
+    categoryBreakdown: Object.keys(row.categoryTotals || {})
+      .sort((a, b) => a.localeCompare(b))
+      .map((categoryName) => {
+        const total = Number(row.categoryTotals?.[categoryName] || 0);
+        const eventsPlayed = Number(row.categoryEventCounts?.[categoryName] || 0);
+        const avgWeightedPoints = eventsPlayed > 0 ? Number((total / eventsPlayed).toFixed(4)) : 0;
+        const lookup = categoryRankLookup.get(`${categoryName}::${row.contenderKey}`);
+
+        return {
+          categoryName,
+          categoryRank: Number(lookup?.categoryRank || 0),
+          avgWeightedPoints: Number(lookup?.avgWeightedPoints ?? avgWeightedPoints),
+          eventsPlayed
+        };
+      })
+  }));
 };
 
 const getCategoryRankings = async (req, res) => {
