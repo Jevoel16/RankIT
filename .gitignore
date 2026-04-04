@@ -12,20 +12,3 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Seeder directories
-**/seeders/**
-
-# Backend script files
-backend/scripts/**
-
-#md Files
-BACKEND_STRUCTURE_EXPLANATION.md
-FRONTEND_STRUCTURE_EXPLANATION.md
-EVENT_FINALIZATION_IMPLEMENTATION.md
-DOMAIN_AUTHENTICATION_IMPLEMENTATION.md
-FRONTEND_README.md
-BACKEND_README.md
-ITD110_CASE_STUDY_1_COMPLIANCE_CHECK.md
-ProjectContext.md
-SETUP.md
-VERCEL_SETUP.md

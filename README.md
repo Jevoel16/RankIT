@@ -1,6 +1,6 @@
 # RankIT
 
-RankIT is a role-based event tabulation platform for school competitions.
+RankIT is a role-based event tabulation platform for school events.
 
 It has:
 - A public community page for live rankings
@@ -159,10 +159,3 @@ Expected local URLs:
 - backend: Express API, MongoDB models, controllers, routes, seed scripts
 - frontend-react: React app, pages/components/hooks, report UI and exports
 
-## Additional Docs
-
-- SETUP.md
-- BACKEND_README.md
-- FRONTEND_README.md
-- VERCEL_SETUP.md
-- ITD110_CASE_STUDY_1_COMPLIANCE_CHECK.md
