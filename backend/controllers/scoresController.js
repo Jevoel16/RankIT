@@ -270,7 +270,7 @@ const buildRankings = async (eventId) => {
     },
     {
       $lookup: {
-        from: 'tallies',
+        from: 'scoresheets',
         let: { contestantId: '$_id' },
         pipeline: [
           {
@@ -775,10 +775,10 @@ const getMasterEventResults = async (req, res) => {
           return;
         }
 
-        const average = values.reduce((sum, value) => sum + value, 0) / values.length;
-        const roundedAverage = Number(average.toFixed(2));
-        criterionScores[label] = roundedAverage;
-        totalScore += roundedAverage;
+        const summedScore = values.reduce((sum, value) => sum + value, 0);
+        const roundedSummedScore = Number(summedScore.toFixed(2));
+        criterionScores[label] = roundedSummedScore;
+        totalScore += roundedSummedScore;
       });
 
       return {

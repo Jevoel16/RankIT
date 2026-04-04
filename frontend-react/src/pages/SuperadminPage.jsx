@@ -55,144 +55,128 @@ function RoleTable({ title, rows }) {
   );
 }
 
-function RoleDistributionGraph({ rows }) {
+function PlatformAnalyticsGraph({ rows, totals, users }) {
+  const [metricFilter, setMetricFilter] = useState('total');
   const safeRows = rows || [];
-  const maxCount = Math.max(...safeRows.map((row) => row.count || 0), 1);
+  const allUsersList = users || [];
+  const approvedUsers = Number(totals?.approvedUsers || 0);
+  const pendingUsers = Number(totals?.pendingUsers || 0);
+  const totalUsers = Number(totals?.users || safeRows.reduce((sum, row) => sum + Number(row.count || 0), 0));
+  const ringRadius = 66;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const palette = ['#2fd0ff', '#22c98d', '#f2b94b', '#ff5f6d', '#7da6ff', '#8b98ab'];
+  const filteredUsers = useMemo(() => {
+    if (metricFilter === 'approved') {
+      return allUsersList.filter((user) => user.isApproved || user.approvalStatus === 'approved');
+    }
+
+    if (metricFilter === 'pending') {
+      return allUsersList.filter((user) => user.approvalStatus === 'pending' || (!user.isApproved && !user.approvalStatus));
+    }
+
+    return allUsersList;
+  }, [allUsersList, metricFilter]);
+
+  const roleOrder = safeRows.length > 0 ? safeRows : [
+    { role: 'admin', count: 0 },
+    { role: 'grievance', count: 0 },
+    { role: 'superadmin', count: 0 },
+    { role: 'tabulator', count: 0 }
+  ];
+
+  const filteredRoleCounts = useMemo(() => {
+    const counts = new Map();
+
+    filteredUsers.forEach((user) => {
+      const role = String(user.role || '').trim();
+      if (!role) return;
+      counts.set(role, (counts.get(role) || 0) + 1);
+    });
+
+    return counts;
+  }, [filteredUsers]);
+
+  const donutSegments = roleOrder.map((row, index) => ({
+    label: row.role,
+    value: Number(filteredRoleCounts.get(row.role) || 0),
+    color: palette[index % palette.length]
+  }));
+
+  const displayValue =
+    metricFilter === 'approved' ? approvedUsers : metricFilter === 'pending' ? pendingUsers : totalUsers;
+  const displayLabel =
+    metricFilter === 'approved' ? 'Approved Users' : metricFilter === 'pending' ? 'Pending Users' : 'Total Users';
+  const segmentTotal = Math.max(filteredUsers.length, 1);
+  let cumulative = 0;
 
   return (
-    <div className="panel">
-      <div className="section-head">
-        <h3>Users By Role</h3>
-        <span className="muted">Horizontal Bar Graph</span>
-      </div>
-      {safeRows.length === 0 ? (
-        <p className="muted">No role data available yet.</p>
-      ) : (
-        <div className="graph-stack">
-          {safeRows.map((row) => {
-            const widthPercent = Math.round(((row.count || 0) / maxCount) * 100);
-            return (
-              <div key={row.role} className="hbar-row">
-                <div className="hbar-label">{row.role}</div>
-                <div className="hbar-track">
-                  <div className="hbar-fill" style={{ width: `${widthPercent}%` }} />
-                </div>
-                <div className="hbar-value">{row.count}</div>
-              </div>
-            );
-          })}
+    <div className="panel analytics-combined-panel">
+      <div className="section-head analytics-graph-head">
+        <h3>User Analytics</h3>
+        <div className="analytics-filter-row">
+          <select
+            id="analyticsMetricFilter"
+            className="analytics-filter-select"
+            value={metricFilter}
+            onChange={(event) => setMetricFilter(event.target.value)}
+            aria-label="Platform analytics metric filter"
+          >
+            <option value="total">Total Users</option>
+            <option value="approved">Approved Users</option>
+            <option value="pending">Pending Users</option>
+          </select>
         </div>
-      )}
-    </div>
-  );
-}
-
-function EventSubmissionsGraph({ rows }) {
-  const safeRows = rows || [];
-  const maxSubmissions = Math.max(...safeRows.map((row) => row.submissions || 0), 1);
-
-  return (
-    <div className="panel">
-      <div className="section-head">
-        <h3>Event Submissions</h3>
-        <span className="muted">Vertical Bar Graph</span>
       </div>
-      {safeRows.length === 0 ? (
-        <p className="muted">No event submission data available yet.</p>
-      ) : (
-        <div className="vbar-chart-wrap">
-          <div className="vbar-chart">
-            {safeRows.map((row) => {
-              const heightPercent = Math.max(6, Math.round(((row.submissions || 0) / maxSubmissions) * 100));
+      <div className="analytics-donut-layout">
+        <div className="analytics-donut-wrap" aria-hidden="true">
+          <svg className="analytics-donut" viewBox="0 0 180 180">
+            <circle cx="90" cy="90" r={ringRadius} className="analytics-donut-track" />
+            {donutSegments.map((segment) => {
+              const currentValue = Number(segment.value || 0);
+              const dash = segmentTotal > 0 ? (currentValue / segmentTotal) * ringCircumference : 0;
+              const offset = -cumulative;
+              cumulative += dash;
               return (
-                <div className="vbar-col" key={row.eventId}>
-                  <div className="vbar-value">{row.submissions}</div>
-                  <div className="vbar-track">
-                    <div className="vbar-fill" style={{ height: `${heightPercent}%` }} />
-                  </div>
-                  <div className="vbar-label" title={row.eventName}>{row.eventName}</div>
-                  <div className="vbar-sub">Avg {row.averageScore}</div>
-                </div>
+                <circle
+                  key={segment.label}
+                  cx="90"
+                  cy="90"
+                  r={ringRadius}
+                  className="analytics-donut-segment"
+                  stroke={segment.color}
+                  strokeDasharray={`${dash} ${Math.max(ringCircumference - dash, 0)}`}
+                  strokeDashoffset={offset}
+                />
               );
             })}
+          </svg>
+          <div className="analytics-donut-center">
+            <strong>{displayValue}</strong>
+            <span>{displayLabel}</span>
           </div>
         </div>
-      )}
-    </div>
-  );
-}
-
-function EventAverageLineGraph({ rows }) {
-  const safeRows = rows || [];
-
-  if (safeRows.length === 0) {
-    return (
-      <div className="panel">
-        <div className="section-head">
-          <h3>Average Score Trend</h3>
-          <span className="muted">Line Graph</span>
+        <div className="analytics-donut-legend">
+          {donutSegments.length === 0 ? (
+            <p className="muted">No role data available yet.</p>
+          ) : (
+            donutSegments.map((segment) => {
+              const segmentValue = Number(segment.value || 0);
+              const percent = segmentTotal > 0 ? Math.round((segmentValue / segmentTotal) * 100) : 0;
+              return (
+                <div key={segment.label} className="analytics-legend-row">
+                  <div className="analytics-legend-role">
+                    <span className="analytics-legend-dot" style={{ backgroundColor: segment.color }} />
+                    <span>{segment.label}</span>
+                  </div>
+                  <div className="analytics-legend-meta">
+                    <strong>{segmentValue}</strong>
+                    <span>{percent}%</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
-        <p className="muted">No average score data available yet.</p>
-      </div>
-    );
-  }
-
-  const chartWidth = Math.max(420, safeRows.length * 90);
-  const chartHeight = 220;
-  const padding = 28;
-  const innerWidth = chartWidth - padding * 2;
-  const innerHeight = chartHeight - padding * 2;
-  const values = safeRows.map((row) => Number(row.averageScore || 0));
-  const maxValue = Math.max(...values, 1);
-
-  const points = safeRows.map((row, index) => {
-    const x = padding + (safeRows.length === 1 ? innerWidth / 2 : (index / (safeRows.length - 1)) * innerWidth);
-    const y = padding + (1 - Number(row.averageScore || 0) / maxValue) * innerHeight;
-    return {
-      x,
-      y,
-      label: row.eventName,
-      value: Number(row.averageScore || 0)
-    };
-  });
-
-  const polylinePoints = points.map((point) => `${point.x},${point.y}`).join(' ');
-
-  return (
-    <div className="panel">
-      <div className="section-head">
-        <h3>Average Score Trend</h3>
-        <span className="muted">Line Graph</span>
-      </div>
-      <div className="line-chart-wrap">
-        <svg className="line-chart" viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
-          <line
-            x1={padding}
-            y1={chartHeight - padding}
-            x2={chartWidth - padding}
-            y2={chartHeight - padding}
-            className="line-axis"
-          />
-          <line
-            x1={padding}
-            y1={padding}
-            x2={padding}
-            y2={chartHeight - padding}
-            className="line-axis"
-          />
-          <polyline points={polylinePoints} className="line-path" />
-          {points.map((point) => (
-            <g key={point.label}>
-              <circle cx={point.x} cy={point.y} r="4" className="line-point" />
-              <text x={point.x} y={chartHeight - 8} textAnchor="middle" className="line-x-label">
-                {point.label.length > 12 ? `${point.label.slice(0, 12)}...` : point.label}
-              </text>
-              <text x={point.x} y={point.y - 10} textAnchor="middle" className="line-value-label">
-                {point.value}
-              </text>
-            </g>
-          ))}
-        </svg>
       </div>
     </div>
   );
@@ -201,7 +185,6 @@ function EventAverageLineGraph({ rows }) {
 export default function SuperadminPage() {
   const { token, user } = useAuth();
   const [activeTab, setActiveTab] = useState('analytics');
-  const [analyticsSubtab, setAnalyticsSubtab] = useState('users-by-role');
   const [userSubtab, setUserSubtab] = useState('approval');
   const [usersSearch, setUsersSearch] = useState('');
   const [usersRoleFilter, setUsersRoleFilter] = useState('all');
@@ -290,7 +273,6 @@ export default function SuperadminPage() {
       if (saved) {
         const parsed = JSON.parse(saved);
         setActiveTab(parsed.activeTab || 'analytics');
-        setAnalyticsSubtab(parsed.analyticsSubtab || 'users-by-role');
         setUserSubtab(parsed.userSubtab || 'approval');
         setUsersSearch(parsed.usersSearch || '');
         setUsersRoleFilter(parsed.usersRoleFilter || 'all');
@@ -317,7 +299,6 @@ export default function SuperadminPage() {
         stateStorageKey,
         JSON.stringify({
           activeTab,
-          analyticsSubtab,
           userSubtab,
           usersSearch,
           usersRoleFilter,
@@ -334,7 +315,6 @@ export default function SuperadminPage() {
   }, [
     stateStorageKey,
     activeTab,
-    analyticsSubtab,
     userSubtab,
     usersSearch,
     usersRoleFilter,
@@ -351,13 +331,6 @@ export default function SuperadminPage() {
     }
     recordUserAction('active_tab_changed', activeTab);
   }, [activeTab]);
-
-  useEffect(() => {
-    if (!hasHydratedRef.current) {
-      return;
-    }
-    recordUserAction('analytics_subtab_changed', analyticsSubtab);
-  }, [analyticsSubtab]);
 
   useEffect(() => {
     if (!hasHydratedRef.current) {
@@ -526,7 +499,6 @@ export default function SuperadminPage() {
         <div className="panel stack">
           <div className="section-head">
             <h2>Platform Analytics</h2>
-            <span className="muted">System Overview</span>
           </div>
 
           <div className="status-kpi">
@@ -538,39 +510,7 @@ export default function SuperadminPage() {
             <div className="kpi-chip"><strong>Tallies</strong>{analytics?.totals?.tallies ?? 0}</div>
           </div>
 
-          <div className="sub-tabs" role="tablist" aria-label="Analytics Visualizations">
-            <button
-              type="button"
-              className={`subtab-btn ${analyticsSubtab === 'users-by-role' ? 'active' : ''}`}
-              onClick={() => setAnalyticsSubtab('users-by-role')}
-            >
-              Users By Role
-            </button>
-            <button
-              type="button"
-              className={`subtab-btn ${analyticsSubtab === 'event-submissions' ? 'active' : ''}`}
-              onClick={() => setAnalyticsSubtab('event-submissions')}
-            >
-              Event Submissions
-            </button>
-            <button
-              type="button"
-              className={`subtab-btn ${analyticsSubtab === 'average-score-trend' ? 'active' : ''}`}
-              onClick={() => setAnalyticsSubtab('average-score-trend')}
-            >
-              Average Score Trend
-            </button>
-          </div>
-
-          {analyticsSubtab === 'users-by-role' && (
-            <RoleDistributionGraph rows={analytics?.usersByRole} />
-          )}
-          {analyticsSubtab === 'event-submissions' && (
-            <EventSubmissionsGraph rows={analytics?.talliesByEvent} />
-          )}
-          {analyticsSubtab === 'average-score-trend' && (
-            <EventAverageLineGraph rows={analytics?.talliesByEvent} />
-          )}
+          <PlatformAnalyticsGraph rows={analytics?.usersByRole} totals={analytics?.totals} users={allUsers} />
         </div>
       )}
 
@@ -578,7 +518,6 @@ export default function SuperadminPage() {
         <div className="panel stack">
           <div className="section-head">
             <h2>User Oversight</h2>
-            <span className="muted">Role-Based Management</span>
           </div>
 
           <div className="sub-tabs" role="tablist" aria-label="User Oversight Features">
@@ -627,10 +566,7 @@ export default function SuperadminPage() {
             <div className="panel stack">
               <div className="section-head">
                 <h3>Users Directory</h3>
-                <span className="muted">All-users listing and export</span>
               </div>
-
-              <p className="muted">Shows all users with role, approval, and status details.</p>
 
               <div className="user-filter-row">
                 <div>
@@ -681,7 +617,6 @@ export default function SuperadminPage() {
               <div className="panel">
                 <div className="section-head">
                   <h3>All Users</h3>
-                  <span className="muted">Filtered Directory</span>
                 </div>
                 <div className="table-wrap">
                   <table>
@@ -729,7 +664,6 @@ export default function SuperadminPage() {
         <div className="panel stack">
           <div className="section-head">
             <h2>Audit Trail</h2>
-            <span className="muted">Superadmin Access</span>
           </div>
 
           <div className="audit-filter-row">

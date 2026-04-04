@@ -149,7 +149,7 @@ const getTabulatorEventAssignmentSummary = async (req, res) => {
       },
       {
         $lookup: {
-          from: 'tallies',
+          from: 'scoresheets',
           let: { eventId: '$_id' },
           pipeline: [
             { $match: { $expr: { $eq: ['$eventId', '$$eventId'] } } },

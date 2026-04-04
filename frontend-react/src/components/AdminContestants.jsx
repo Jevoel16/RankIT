@@ -112,7 +112,6 @@ export default function AdminContestants({ token }) {
     <div className="panel stack">
       <div className="section-head">
         <h2>Contestants</h2>
-        <span className="muted">Create and manage by event</span>
       </div>
 
       <label htmlFor="contestant-event">Event</label>

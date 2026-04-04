@@ -101,10 +101,7 @@ export default function AdminUsers({
         <>
           <div className="section-head">
             <h2>User Approval</h2>
-            <span className="muted">IAM Queue</span>
           </div>
-          <p className="muted">Pending accounts stay locked until an Admin approves them.</p>
-
           <div className="table-wrap">
             <table>
               <thead>
@@ -164,7 +161,6 @@ export default function AdminUsers({
         <>
           <div className="section-head">
             <h3>Manual Create User</h3>
-            <span className="muted">Bypass Approval</span>
           </div>
           <form className="stack" onSubmit={onCreate}>
             <label htmlFor="admin-create-username">Username</label>

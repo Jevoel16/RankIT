@@ -12,6 +12,12 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Seeder directories
+**/seeders/**
+
+# Backend script files
+backend/scripts/**
+
 #md Files
 BACKEND_STRUCTURE_EXPLANATION.md
 FRONTEND_STRUCTURE_EXPLANATION.md

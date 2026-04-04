@@ -66,7 +66,7 @@ const scoreSheetSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    collection: 'tallies'
+    collection: 'scoresheets'
   }
 );
 

@@ -157,7 +157,7 @@ const buildBaseContestantScoringPipeline = ({ categoryName } = {}) => {
     },
     {
       $lookup: {
-        from: 'tallies',
+        from: 'scoresheets',
         let: { contestantId: '$_id', eventId: '$eventId' },
         pipeline: [
           {

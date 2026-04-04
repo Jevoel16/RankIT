@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+  import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { fetchPublicCategoryRankings, fetchPublicLeaderboard, fetchPublicOverallLeaderboard } from '../api';
 import { useAuth } from '../hooks/useAuth';
@@ -199,7 +199,8 @@ export default function CommunityHome() {
   const publicTopbar = !isAuthenticated ? (
     <div className="community-topbar">
       <Link to="/" className="community-brand">
-        RankIT
+        <img src="/logo.ico" alt="" className="brand-logo-icon" aria-hidden="true" />
+        <span>RankIT</span>
       </Link>
       <Link to="/login" className="community-login no-print">
         Staff Login

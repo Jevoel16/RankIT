@@ -15,7 +15,10 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-main">
-        <Link to="/" className="brand">RankIT</Link>
+        <Link to="/" className="brand">
+          <img src="/logo.ico" alt="" className="brand-logo-icon" aria-hidden="true" />
+          <span>RankIT</span>
+        </Link>
         <div className="nav-links">
           {links.map((item) => (
             <Link

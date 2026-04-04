@@ -3,11 +3,13 @@ import {
   fetchContestants,
   fetchEvents,
   fetchEventScores,
-  fileContestantGrievance
+  fileContestantGrievance,
+  fetchMasterEventResults
 } from '../api';
 import { useAuth } from '../hooks/useAuth';
 import usePagination from '../hooks/usePagination';
 import TablePager from '../components/TablePager';
+import MasterReportPreviewModal from '../components/MasterReportPreviewModal';
 
 export default function GrievancePage() {
   const { token } = useAuth();
@@ -21,6 +23,9 @@ export default function GrievancePage() {
   const [reason, setReason] = useState('');
   const [deductionPoints, setDeductionPoints] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [reportPreviewData, setReportPreviewData] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -115,6 +120,25 @@ export default function GrievancePage() {
     }
   };
 
+  const onPreviewDeductionNotes = async () => {
+    if (!selectedEventId) {
+      setError('Select a special event first.');
+      return;
+    }
+
+    try {
+      setPreviewLoading(true);
+      setError('');
+      const reportData = await fetchMasterEventResults(selectedEventId, token);
+      setReportPreviewData(reportData);
+      setPreviewOpen(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   return (
     <section className="admin-workspace">
       <div className="admin-tabs" role="tablist" aria-label="Grievance Sections">
@@ -124,6 +148,13 @@ export default function GrievancePage() {
           onClick={() => setActiveTab('grieve')}
         >
           Grieve
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${activeTab === 'print' ? 'active' : ''}`}
+          onClick={() => setActiveTab('print')}
+        >
+          Download Deduction Notes PDF
         </button>
       </div>
 
@@ -197,6 +228,35 @@ export default function GrievancePage() {
         </>
       )}
 
+      {activeTab === 'print' && (
+        <div className="panel stack tab-content-panel">
+          <div className="section-head">
+            <h3>Download Deduction Notes PDF</h3>
+          </div>
+
+          <label htmlFor="grievance-event-print">Special Event</label>
+          <select
+            id="grievance-event-print"
+            value={selectedEventId}
+            onChange={(e) => setSelectedEventId(e.target.value)}
+            disabled={events.length === 0}
+          >
+            {events.length === 0 && <option value="">No special events available</option>}
+            {events.map((event) => (
+              <option key={event._id} value={event._id}>
+                {event.name}
+              </option>
+            ))}
+          </select>
+
+          <div className="action-cell">
+            <button type="button" className="ghost-btn no-print" onClick={onPreviewDeductionNotes} disabled={previewLoading || !selectedEventId}>
+              {previewLoading ? 'Preparing Deduction Notes...' : 'Preview Deduction Notes PDF'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && <p className="error">{error}</p>}
       {success && <p className="success">{success}</p>}
 
@@ -242,6 +302,14 @@ export default function GrievancePage() {
           </div>
         </div>
       )}
+
+      <MasterReportPreviewModal
+        open={previewOpen}
+        reportData={reportPreviewData}
+        onClose={() => setPreviewOpen(false)}
+        viewerRole="grievance"
+        preferredTab="deduction"
+      />
       </section>
     </section>
   );

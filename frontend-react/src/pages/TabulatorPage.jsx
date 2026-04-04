@@ -735,35 +735,30 @@ export default function TabulatorPage() {
       </div>
 
       <section className="panel">
-
-      <label htmlFor="tab-event">Event</label>
-      
-      <select
-        id="tab-event"
-        value={selectedEventId}
-        onChange={(e) => {
-          const nextEventId = e.target.value;
-          setSelectedEventId(nextEventId);
-          setActiveEvent({ eventId: nextEventId, source: 'tabulator-manual' });
-        }}
-      >
-        {events.map((event) => (
-          <option key={event._id} value={event._id}>
-            {event.name}
-          </option>
-        ))}
-      </select>
+        <div className="tabulator-event-bar tabulator-event-card">
+          <label htmlFor="tab-event">Event</label>
+          <select
+            id="tab-event"
+            value={selectedEventId}
+            onChange={(e) => {
+              const nextEventId = e.target.value;
+              setSelectedEventId(nextEventId);
+              setActiveEvent({ eventId: nextEventId, source: 'tabulator-manual' });
+            }}
+          >
+            {events.map((event) => (
+              <option key={event._id} value={event._id}>
+                {event.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
       {activeTab === 'scores' && (
         <div className="tab-content-shell">
           <div className="panel stack tab-content-panel">
             <div className="section-head">
               <h3>Record Offline Scores</h3>
-              <span className="muted">
-                {isSportsEvent
-                  ? 'Tabulator records team-vs-team match outcomes per sports subevent'
-                  : 'Tabulator enters one physical judge sheet at a time'}
-              </span>
             </div>
 
             <form onSubmit={onRecordOfflineScore}>
@@ -1035,21 +1030,43 @@ export default function TabulatorPage() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Subevent</th>
-                      <th>Contestant</th>
-                      <th>Total Score</th>
-                      <th>Winner</th>
-                      <th>Submitted</th>
+                      {isSportsEvent ? (
+                        <>
+                          <th>Subevent</th>
+                          <th>Contestant</th>
+                          <th>Total Score</th>
+                          <th>Winner</th>
+                          <th>Submitted</th>
+                        </>
+                      ) : (
+                        <>
+                          <th>Contestant</th>
+                          <th>Judge</th>
+                          <th>Total Score</th>
+                          <th>Submitted</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {recordedScores.map((row) => (
                       <tr key={row._id}>
-                        <td>{row.stage ? `${String(row.stage).toUpperCase()} #${row.matchNumber || 1}` : '-'}</td>
-                        <td>{row.contestantName}</td>
-                        <td>{typeof row.totalScore === 'number' ? Number(row.totalScore || 0).toFixed(2) : (row.totalScore || '-')}</td>
-                        <td>{row.winnerName || '-'}</td>
-                        <td>{row.submittedAt ? new Date(row.submittedAt).toLocaleString() : '-'}</td>
+                        {isSportsEvent ? (
+                          <>
+                            <td>{row.stage ? `${String(row.stage).toUpperCase()} #${row.matchNumber || 1}` : '-'}</td>
+                            <td>{row.contestantName}</td>
+                            <td>{typeof row.totalScore === 'number' ? Number(row.totalScore || 0).toFixed(2) : (row.totalScore || '-')}</td>
+                            <td>{row.winnerName || '-'}</td>
+                            <td>{row.submittedAt ? new Date(row.submittedAt).toLocaleString() : '-'}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td>{row.contestantName}</td>
+                            <td>{row.physicalJudgeName || '-'}</td>
+                            <td>{typeof row.totalScore === 'number' ? Number(row.totalScore || 0).toFixed(2) : (row.totalScore || '-')}</td>
+                            <td>{row.submittedAt ? new Date(row.submittedAt).toLocaleString() : '-'}</td>
+                          </>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -1067,7 +1084,6 @@ export default function TabulatorPage() {
           <div className="panel stack tab-content-panel">
             <div className="section-head">
               <h3>Download Tabulation PDF</h3>
-              <span className="muted">Preview and download current event master report</span>
             </div>
 
             <p className="muted">
@@ -1085,6 +1101,8 @@ export default function TabulatorPage() {
       <MasterReportPreviewModal
         open={previewOpen}
         reportData={reportPreviewData}
+        viewerRole={user?.role || 'tabulator'}
+        preferredTab="main"
         onClose={() => setPreviewOpen(false)}
       />
       </section>

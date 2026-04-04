@@ -95,7 +95,7 @@ const getPublicLeaderboard = async (req, res) => {
         },
         {
           $lookup: {
-            from: 'tallies',
+            from: 'scoresheets',
             let: { contestantId: '$_id' },
             pipeline: [
               {

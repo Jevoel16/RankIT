@@ -64,6 +64,11 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  useEffect(() => {
+    setError('');
+    setSuccess('');
+  }, [activeTab, userSubtab, eventSubtab, settingsSubtab]);
+
   const loadEvents = async () => {
     const data = await fetchEvents(token);
     setEvents(data);
@@ -428,13 +433,7 @@ export default function AdminPage() {
             <div className="panel stack">
               <div className="section-head">
                 <h3>{isSetBasedCategory ? 'Create Sports Event' : 'Create Event'}</h3>
-                <span className="muted">{isSetBasedCategory ? 'Set-based scoring for sports events' : 'Dynamic Criteria Builder'}</span>
               </div>
-              <p className="muted">
-                {isSetBasedCategory
-                  ? 'Tabulators will record each set score instead of judging criteria.'
-                  : 'Admin can define dynamic criteria and weights.'}
-              </p>
 
               <div className="status-kpi">
                 <div className="kpi-chip">
@@ -455,26 +454,100 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <form onSubmit={onCreateEvent} className="stack">
-                <label htmlFor="event-name">Event Name</label>
-                <input id="event-name" value={name} onChange={(e) => setName(e.target.value)} required />
+              <form onSubmit={onCreateEvent} className="stack create-event-form">
+                {!isSetBasedCategory ? (
+                  <div className="create-event-grid">
+                    <div className="create-event-left criteria-box stack">
+                      <div className="create-event-field">
+                        <label htmlFor="event-name">Event Name</label>
+                        <input id="event-name" value={name} onChange={(e) => setName(e.target.value)} required />
+                      </div>
 
-                <label htmlFor="event-category">Category</label>
-                <select
-                  id="event-category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  required
-                >
-                  {EVENT_CATEGORIES.map((categoryOption) => (
-                    <option key={categoryOption} value={categoryOption}>
-                      {categoryOption}
-                    </option>
-                  ))}
-                </select>
+                      <div className="create-event-field">
+                        <label htmlFor="event-category">Category</label>
+                        <select
+                          id="event-category"
+                          value={category}
+                          onChange={(e) => setCategory(e.target.value)}
+                          required
+                        >
+                          {EVENT_CATEGORIES.map((categoryOption) => (
+                            <option key={categoryOption} value={categoryOption}>
+                              {categoryOption}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                {isSetBasedCategory && (
+                      <div className="create-event-field">
+                        <label htmlFor="required-judges">Number of Judges</label>
+                        <input
+                          id="required-judges"
+                          type="number"
+                          min={1}
+                          value={requiredJudgeCount}
+                          onChange={(e) => setRequiredJudgeCount(Number(e.target.value))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="create-event-right">
+                      <div className="criteria-box">
+                        <div className="criteria-header">
+                          <strong>Criteria</strong>
+                          <span className={totalWeight === 100 ? 'success-inline' : 'warn-inline'}>
+                            Total Weight: {totalWeight}%
+                          </span>
+                        </div>
+                        {criteria.map((criterion, index) => (
+                          <div className="criteria-row" key={index}>
+                            <input
+                              value={criterion.label}
+                              onChange={(e) => updateCriterion(index, 'label', e.target.value)}
+                              placeholder="Label"
+                            />
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={criterion.weight}
+                              onChange={(e) => updateCriterion(index, 'weight', e.target.value)}
+                              placeholder="Weight"
+                            />
+                            <input
+                              type="number"
+                              min={1}
+                              value={criterion.maxScore}
+                              onChange={(e) => updateCriterion(index, 'maxScore', e.target.value)}
+                              placeholder="Max"
+                            />
+                          </div>
+                        ))}
+                        <button type="button" className="ghost-btn" onClick={addCriterion}>
+                          Add Criterion
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                   <>
+                    <label htmlFor="event-name">Event Name</label>
+                    <input id="event-name" value={name} onChange={(e) => setName(e.target.value)} required />
+
+                    <label htmlFor="event-category">Category</label>
+                    <select
+                      id="event-category"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      required
+                    >
+                      {EVENT_CATEGORIES.map((categoryOption) => (
+                        <option key={categoryOption} value={categoryOption}>
+                          {categoryOption}
+                        </option>
+                      ))}
+                    </select>
+
                     <label htmlFor="set-count">Number of Sets</label>
                     <input
                       id="set-count"
@@ -487,57 +560,6 @@ export default function AdminPage() {
                     />
                   </>
                 )}
-
-                {!isSetBasedCategory && (
-                  <>
-                    <label htmlFor="required-judges">Number of Judges</label>
-                    <input
-                      id="required-judges"
-                      type="number"
-                      min={1}
-                      value={requiredJudgeCount}
-                      onChange={(e) => setRequiredJudgeCount(Number(e.target.value))}
-                    />
-                  </>
-                )}
-
-                {!isSetBasedCategory ? (
-                  <div className="criteria-box">
-                    <div className="criteria-header">
-                      <strong>Criteria</strong>
-                      <span className={totalWeight === 100 ? 'success-inline' : 'warn-inline'}>
-                        Total Weight: {totalWeight}%
-                      </span>
-                    </div>
-                    {criteria.map((criterion, index) => (
-                      <div className="criteria-row" key={index}>
-                        <input
-                          value={criterion.label}
-                          onChange={(e) => updateCriterion(index, 'label', e.target.value)}
-                          placeholder="Label"
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={criterion.weight}
-                          onChange={(e) => updateCriterion(index, 'weight', e.target.value)}
-                          placeholder="Weight"
-                        />
-                        <input
-                          type="number"
-                          min={1}
-                          value={criterion.maxScore}
-                          onChange={(e) => updateCriterion(index, 'maxScore', e.target.value)}
-                          placeholder="Max"
-                        />
-                      </div>
-                    ))}
-                    <button type="button" className="ghost-btn" onClick={addCriterion}>
-                      Add Criterion
-                    </button>
-                  </div>
-                ) : null}
 
                 {error && <p className="error">{error}</p>}
                 {success && <p className="success">{success}</p>}
@@ -553,34 +575,51 @@ export default function AdminPage() {
             <div className="panel stack">
               <div className="section-head">
                 <h3>Assign Tabulator</h3>
-                <span className="muted">Set event ownership for tabulators</span>
               </div>
-              <p className="muted">Set event ownership for tabulators.</p>
               {events.length === 0 && <p className="muted">No events available yet.</p>}
-              {events.map((event) => (
-                <div key={event._id} className="criteria-row">
-                  <strong>{event.name}</strong>
-                  <select
-                    value={eventTabulatorMap[event._id] || ''}
-                    onChange={(e) =>
-                      setEventTabulatorMap((prev) => ({
-                        ...prev,
-                        [event._id]: e.target.value
-                      }))
-                    }
-                  >
-                    <option value="">Select tabulator</option>
-                    {tabulators.map((tabulator) => (
-                      <option key={tabulator._id} value={tabulator._id}>
-                        {tabulator.username}
-                      </option>
-                    ))}
-                  </select>
-                  <button type="button" className="ghost-btn" onClick={() => onAssignEventTabulator(event._id)}>
-                    Save Assignment
-                  </button>
+              {events.length > 0 && (
+                <div className="table-wrap assign-tabulator-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Event</th>
+                        <th>Tabulator</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {events.map((event) => (
+                        <tr key={event._id}>
+                          <td><strong>{event.name}</strong></td>
+                          <td>
+                            <select
+                              value={eventTabulatorMap[event._id] || ''}
+                              onChange={(e) =>
+                                setEventTabulatorMap((prev) => ({
+                                  ...prev,
+                                  [event._id]: e.target.value
+                                }))
+                              }
+                            >
+                              <option value="">Select tabulator</option>
+                              {tabulators.map((tabulator) => (
+                                <option key={tabulator._id} value={tabulator._id}>
+                                  {tabulator.username}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <button type="button" className="ghost-btn" onClick={() => onAssignEventTabulator(event._id)}>
+                              Save Assignment
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              )}
               {error && <p className="error">{error}</p>}
               {success && <p className="success">{success}</p>}
             </div>
@@ -598,7 +637,6 @@ export default function AdminPage() {
           <div className="panel stack tab-content-panel">
           <div className="section-head">
             <h2>Admin Settings</h2>
-            <span className="muted">System maintenance</span>
           </div>
 
           <div className="sub-tabs" role="tablist" aria-label="Admin Settings Actions">
@@ -629,7 +667,6 @@ export default function AdminPage() {
             <div className="panel stack">
               <div className="section-head">
                 <h3>System Backup</h3>
-                <span className="muted">Export platform data</span>
               </div>
               <p className="muted">Download a full JSON backup of events, contestants, scores, and users.</p>
               <button type="button" onClick={onDownloadBackup} disabled={backupLoading}>
@@ -642,7 +679,6 @@ export default function AdminPage() {
             <div className="panel stack">
               <div className="section-head">
                 <h3>Master Event Report</h3>
-                <span className="muted">All contestants by criteria with totals</span>
               </div>
               <label htmlFor="master-report-event">Event</label>
               <select
@@ -666,7 +702,6 @@ export default function AdminPage() {
             <div className="panel stack">
               <div className="section-head">
                 <h3>Community Access</h3>
-                <span className="muted">Control ranking tabs and visible events</span>
               </div>
 
               <div className="status-kpi">
@@ -693,8 +728,6 @@ export default function AdminPage() {
                   </button>
                 </div>
               </div>
-
-              <p className="muted">Only events marked as visible will appear on the community event tab.</p>
 
               {communityLoading ? (
                 <p className="muted">Loading community access settings...</p>
@@ -756,6 +789,8 @@ export default function AdminPage() {
       <MasterReportPreviewModal
         open={previewOpen}
         reportData={reportPreviewData}
+        viewerRole="admin"
+        preferredTab="main"
         onClose={() => setPreviewOpen(false)}
       />
     </section>

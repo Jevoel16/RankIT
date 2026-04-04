@@ -398,7 +398,7 @@ const patchEventStatus = async (req, res) => {
                 },
                 {
                     $lookup: {
-                        from: 'tallies',
+                        from: 'scoresheets',
                         let: { contestantId: '$_id' },
                         pipeline: [
                             {

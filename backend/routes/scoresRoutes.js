@@ -5,7 +5,7 @@ const { recordOfflineScore, getEventScores, getMasterEventResults, generateSport
 
 router.post('/record', authenticate, authorize('tabulator'), authorizeEventAssignment({ eventIdSource: 'body', allowedAssignedRoles: ['tabulator'] }), recordOfflineScore);
 router.get('/event/:id', authenticate, authorize('admin', 'tabulator', 'grievance'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'superadmin', 'grievance'], allowedAssignedRoles: ['tabulator'] }), getEventScores);
-router.get('/master/:eventId', authenticate, authorize('admin', 'tabulator'), authorizeEventAssignment({ eventIdSource: 'params', allowedAssignedRoles: ['tabulator'] }), getMasterEventResults);
+router.get('/master/:eventId', authenticate, authorize('admin', 'tabulator', 'grievance'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'superadmin', 'grievance'], allowedAssignedRoles: ['tabulator'] }), getMasterEventResults);
 router.post('/sports/:eventId/top4-pairings', authenticate, authorize('admin', 'tabulator'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'superadmin'], allowedAssignedRoles: ['tabulator'] }), generateSportsTop4Pairings);
 
 module.exports = router;

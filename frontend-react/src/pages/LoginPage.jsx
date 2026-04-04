@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -16,6 +16,13 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.add('auth-page-lock');
+    return () => {
+      document.body.classList.remove('auth-page-lock');
+    };
+  }, []);
 
   if (isAuthenticated) {
     const to =
@@ -73,7 +80,8 @@ export default function LoginPage() {
   return (
     <main className="auth-shell">
       <Link to="/" className="community-brand auth-brand-link" aria-label="Go to community rankings">
-        RankIT
+        <img src="/logo.ico" alt="" className="brand-logo-icon" aria-hidden="true" />
+        <span>RankIT</span>
       </Link>
       <div className="auth-panel-stack">
         <div className="sub-tabs" role="tablist" aria-label="Authentication Mode">
@@ -111,7 +119,7 @@ export default function LoginPage() {
           placeholder={mode === 'register' ? 'your_name (will be username@role.rankit)' : 'username@role.rankit'}
         />
         {mode === 'login' && (
-          <small style={{ color: 'rgba(255,255,255,0.6)', marginTop: '-6px', marginBottom: '8px', display: 'block' }}>
+          <small className="auth-input-hint">
             Format: username@role.rankit (e.g., john@tabulator.rankit)
           </small>
         )}
@@ -141,7 +149,7 @@ export default function LoginPage() {
               <option value="tabulator">Tabulator</option>
               <option value="grievance">Grievance</option>
             </select>
-            <small style={{ color: 'rgba(255,255,255,0.6)', marginTop: '-8px', marginBottom: '8px', display: 'block' }}>
+            <small className="auth-input-hint auth-input-hint-tight">
               Your username will be formatted as: <strong>your_name@{role}.rankit</strong>
             </small>
           </>
