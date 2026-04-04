@@ -23,6 +23,5 @@ yarn-debug.log*
 yarn-error.log*
 
 #seeders
-./backend/scripts/
 ./backend/scripts/seedEvents.js
 ./backend/scripts/seedUsers.js
