@@ -43,8 +43,93 @@ export default function CommunityHome() {
   const [categoryLoading, setCategoryLoading] = useState(true);
   const [overallLoading, setOverallLoading] = useState(true);
   const [tickerMessage, setTickerMessage] = useState('');
+  const [storageReady, setStorageReady] = useState(false);
+
+  const stateStorageKey = 'rankit_community_state';
+  const actionsStorageKey = 'rankit_community_actions';
 
   const latestUpdateRef = useRef('');
+
+  const recordUserAction = (actionType, value) => {
+    try {
+      const saved = localStorage.getItem(actionsStorageKey);
+      const history = saved ? JSON.parse(saved) : [];
+      history.push({
+        actionType,
+        value,
+        timestamp: new Date().toISOString()
+      });
+      localStorage.setItem(actionsStorageKey, JSON.stringify(history.slice(-250)));
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+  };
+
+  useEffect(() => {
+    setStorageReady(false);
+
+    try {
+      const saved = localStorage.getItem(stateStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const restoredTab = [TAB_EVENT, TAB_CATEGORY, TAB_OVERALL].includes(parsed.activeTab)
+          ? parsed.activeTab
+          : TAB_EVENT;
+        setActiveTab(restoredTab);
+        setSelectedEventCategory(parsed.selectedEventCategory || '');
+        setSelectedEventId(parsed.selectedEventId || '');
+        setSelectedCategoryName(parsed.selectedCategoryName || '');
+      }
+    } catch (_error) {
+      // Ignore malformed storage.
+    } finally {
+      setStorageReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        stateStorageKey,
+        JSON.stringify({
+          activeTab,
+          selectedEventCategory,
+          selectedEventId,
+          selectedCategoryName
+        })
+      );
+    } catch (_error) {
+      // Ignore storage failures.
+    }
+  }, [storageReady, activeTab, selectedEventCategory, selectedEventId, selectedCategoryName]);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+    recordUserAction('community_tab_changed', activeTab);
+  }, [storageReady, activeTab]);
+
+  useEffect(() => {
+    if (!storageReady) {
+      return;
+    }
+    recordUserAction('community_event_filters_changed', {
+      category: selectedEventCategory,
+      eventId: selectedEventId
+    });
+  }, [storageReady, selectedEventCategory, selectedEventId]);
+
+  useEffect(() => {
+    if (!storageReady || !selectedCategoryName) {
+      return;
+    }
+    recordUserAction('community_category_selected', selectedCategoryName);
+  }, [storageReady, selectedCategoryName]);
 
   useEffect(() => {
     let active = true;
