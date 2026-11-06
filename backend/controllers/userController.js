@@ -1,60 +1,12 @@
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
-
-const createToken = (userId) => {
-    const secret = process.env.JWT_SECRET;
-
-    if (!secret) {
-        throw new Error('JWT secret is not configured.');
-    }
-
-    return jwt.sign(
-        { userId },
-        secret,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
-    );
-};
 
 const writeAudit = async ({ action, actorId, entityType, entityId, metadata }) => {
     try {
         await Audit.create({ action, actorId, entityType, entityId, metadata });
     } catch (error) {
         // Logging failures should not block core endpoints.
-    }
-};
-
-const loginUser = async (req, res) => {
-    try {
-        const { username, password } = req.body;
-
-        if (!username || !password) {
-            return res.status(400).json({ message: 'username and password are required.' });
-        }
-
-        const user = await User.findOne({ username });
-        if (!user) {
-            return res.status(401).json({ message: 'Invalid credentials.' });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid credentials.' });
-        }
-
-        const token = createToken(user._id.toString());
-
-        return res.json({
-            token,
-            user: {
-                id: user._id,
-                username: user.username,
-                role: user.role
-            }
-        });
-    } catch (error) {
-        return res.status(500).json({ message: error.message });
     }
 };
 
@@ -174,7 +126,6 @@ const deleteUser = async (req, res) => {
 };
 
 module.exports = {
-    loginUser,
     getUsers,
     createUser,
     updateUser,

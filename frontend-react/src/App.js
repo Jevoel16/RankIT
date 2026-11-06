@@ -93,6 +93,12 @@ function App() {
           <Route path="*" element={<Navigate to={isAuthenticated ? homePath : '/'} replace />} />
         </Routes>
       </main>
+      <footer className="app-footer no-print">
+        RankIT by{' '}
+        <a href="https://github.com/Jevoel16" target="_blank" rel="noopener noreferrer">
+          Sprucetrap
+        </a>
+      </footer>
     </div>
   );
 }

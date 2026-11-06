@@ -12,3 +12,12 @@ Thumbs.db
 .vscode/
 .idea/
 
+
+# Build output
+build/
+dist/
+.vercel
+
+# Local Claude settings and personal instructions
+.claude/
+CLAUDE.md

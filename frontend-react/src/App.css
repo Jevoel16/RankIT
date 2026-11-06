@@ -2237,3 +2237,14 @@ td.action-cell {
     max-width: none;
   }
 }
+
+.app-footer {
+  padding: 16px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted, inherit);
+}
+
+.app-footer a {
+  color: inherit;
+}
