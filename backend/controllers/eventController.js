@@ -179,12 +179,8 @@ const createEvent = async (req, res) => {
         } catch (error) {
             if (error && error.code === 11000 && !attemptedLegacyCategoryIndexDrop) {
                 attemptedLegacyCategoryIndexDrop = true;
-                try {
-                    await Event.collection.dropIndex('category_1');
-                    event = await Event.create(payload);
-                } catch (retryError) {
-                    throw retryError;
-                }
+                await Event.collection.dropIndex('category_1');
+                event = await Event.create(payload);
             } else {
                 throw error;
             }

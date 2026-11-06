@@ -1,6 +1,6 @@
 {
   "name": "backend",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "RankIT REST API",
   "main": "index.js",
   "scripts": {
@@ -9,7 +9,8 @@
     "dev": "nodemon server.js",
     "start:dev": "set NODE_ENV=development&& nodemon server.js",
     "seed:users": "node scripts/seedUsers.js",
-    "seed:events": "node scripts/seedEvents.js"
+    "seed:events": "node scripts/seedEvents.js",
+    "lint": "eslint ."
   },
   "keywords": [],
   "author": "Sprucetrap (github.com/Jevoel16)",
@@ -24,6 +25,12 @@
     "mongoose": "^9.1.5"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
     "nodemon": "^3.1.11"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
