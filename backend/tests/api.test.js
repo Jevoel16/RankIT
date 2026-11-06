@@ -1,11 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import helpers from './helpers';
 
-const { PASSWORD, startApp, stopApp, createUser, loginAs, request } = helpers;
+const { APP_HEADER, PASSWORD, startApp, stopApp, createUser, loginAs, request } = helpers;
 
 let app;
 let users;
-const auth = (agent) => ({ Authorization: `Bearer ${agent.token}` });
 
 beforeAll(async () => {
   app = await startApp();
@@ -35,6 +34,7 @@ describe('health and errors', () => {
   it('rejects malformed JSON without leaking details', async () => {
     const res = await request(app)
       .post('/api/users/login')
+      .set(APP_HEADER)
       .set('Content-Type', 'application/json')
       .send('{"username":');
     expect(res.status).toBe(400);
@@ -52,6 +52,7 @@ describe('auth', () => {
   it('logs in an approved user', async () => {
     const res = await request(app)
       .post('/api/users/login')
+      .set(APP_HEADER)
       .send({ username: users.admin.username, password: PASSWORD });
     expect(res.status).toBe(200);
     expect(res.body.user.role).toBe('admin');
@@ -60,6 +61,7 @@ describe('auth', () => {
   it('blocks pending accounts', async () => {
     const res = await request(app)
       .post('/api/users/login')
+      .set(APP_HEADER)
       .send({ username: users.pending.username, password: PASSWORD });
     expect(res.status).toBe(403);
   });
@@ -67,32 +69,78 @@ describe('auth', () => {
   it('rejects operator injection in login', async () => {
     const res = await request(app)
       .post('/api/users/login')
+      .set(APP_HEADER)
       .send({ username: { $ne: null }, password: { $ne: null } });
     expect(res.status).toBe(400);
   });
 
   it('validates registration input', async () => {
-    const short = await request(app).post('/api/users/register').send({ username: 'newbie', password: '123' });
+    const short = await request(app).post('/api/users/register').set(APP_HEADER).send({ username: 'newbie', password: '123' });
     expect(short.status).toBe(400);
     expect(short.body.message).toMatch(/password/);
 
     const admin = await request(app)
       .post('/api/users/register')
+      .set(APP_HEADER)
       .send({ username: 'sneaky', password: 'long-enough-pw', role: 'admin' });
     expect(admin.status).toBe(400);
+  });
+});
+
+describe('session cookie', () => {
+  it('sets an httpOnly session cookie and returns no token', async () => {
+    const res = await request(app)
+      .post('/api/users/login')
+      .set(APP_HEADER)
+      .send({ username: users.admin.username, password: PASSWORD });
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeUndefined();
+    const cookie = res.headers['set-cookie'].join(';');
+    expect(cookie).toMatch(/rankit_session=/);
+    expect(cookie).toMatch(/HttpOnly/i);
+    expect(cookie).toMatch(/SameSite=Lax/i);
+  });
+
+  it('returns the current user and signs out', async () => {
+    const agent = await loginAs(app, users.grievance);
+    const me = await agent.get('/api/users/me');
+    expect(me.status).toBe(200);
+    expect(me.body.user.role).toBe('grievance');
+
+    const out = await agent.post('/api/users/logout');
+    expect(out.status).toBe(200);
+    expect((await agent.get('/api/users/me')).status).toBe(401);
+  });
+
+  it('rejects state-changing requests without the app header', async () => {
+    const res = await request(app)
+      .post('/api/users/login')
+      .send({ username: users.admin.username, password: PASSWORD });
+    expect(res.status).toBe(403);
+  });
+
+  it('revokes sessions after a password change', async () => {
+    const victim = await createUser('dana', 'tabulator');
+    const session = await loginAs(app, victim);
+    expect((await session.get('/api/users/me')).status).toBe(200);
+
+    const root = await loginAs(app, users.superadmin);
+    const update = await root.put(`/api/users/${victim._id}`).send({ password: 'brand-new-pass' });
+    expect(update.status).toBe(200);
+    expect((await session.get('/api/users/me')).status).toBe(401);
   });
 });
 
 describe('role guards', () => {
   it('forbids tabulators from the audit trail', async () => {
     const agent = await loginAs(app, users.tabulator);
-    const res = await agent.get('/api/audits').set(auth(agent));
+    const res = await agent.get('/api/audits');
     expect(res.status).toBe(403);
   });
 
   it('lets superadmin use admin routes', async () => {
     const agent = await loginAs(app, users.superadmin);
-    const res = await agent.get('/api/events').set(auth(agent));
+    const res = await agent.get('/api/events');
     expect(res.status).toBe(200);
   });
 
@@ -114,7 +162,7 @@ describe('events, scores and deductions', () => {
   it('creates an event and strips unknown fields', async () => {
     const res = await admin
       .post('/api/events')
-      .set(auth(admin))
+      
       .send({
         name: 'Ms. Intrams',
         category: 'Special Events Category',
@@ -133,14 +181,14 @@ describe('events, scores and deductions', () => {
   });
 
   it('rejects an event with an invalid category', async () => {
-    const res = await admin.post('/api/events').set(auth(admin)).send({ name: 'X', category: 'Nope' });
+    const res = await admin.post('/api/events').send({ name: 'X', category: 'Nope' });
     expect(res.status).toBe(400);
   });
 
   it('adds a contestant', async () => {
     const res = await admin
       .post('/api/contestants')
-      .set(auth(admin))
+      
       .send({ name: 'Contestant One', eventId, contestantNumber: 1 });
     expect(res.status).toBe(201);
     contestantId = (res.body.contestant || res.body)._id;
@@ -150,7 +198,7 @@ describe('events, scores and deductions', () => {
     const tab = await loginAs(app, users.tabulator);
     const res = await tab
       .post('/api/scores/record')
-      .set(auth(tab))
+      
       .send({
         eventId,
         contestantId,
@@ -164,19 +212,19 @@ describe('events, scores and deductions', () => {
     const griev = await loginAs(app, users.grievance);
     const missing = await griev
       .patch(`/api/contestants/${contestantId}/deduct`)
-      .set(auth(griev))
+      
       .send({ deductionPoints: 2 });
     expect(missing.status).toBe(400);
 
     const ok = await griev
       .patch(`/api/contestants/${contestantId}/deduct`)
-      .set(auth(griev))
+      
       .send({ deductionPoints: 2, reason: 'Late entrance' });
     expect(ok.status).toBe(200);
   });
 
   it('exports a backup without password hashes', async () => {
-    const res = await admin.get('/api/admin/backup').set(auth(admin));
+    const res = await admin.get('/api/admin/backup');
     expect(res.status).toBe(200);
     const body = JSON.parse(res.text);
     expect(body.collections.users.length).toBeGreaterThan(0);

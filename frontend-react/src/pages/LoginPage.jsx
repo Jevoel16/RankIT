@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState('tabulator');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(location.state?.notice || '');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [storageReady, setStorageReady] = useState(false);
@@ -204,7 +204,7 @@ export default function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          autoComplete="current-password"
+          autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
         />
         {mode === 'register' && (
           <>

@@ -1,11 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const dotenv = require('dotenv');
 const path = require('path');
 const connectDB = require('./config/db');
 const { errorHandler, notFoundHandler } = require('./utils/httpErrors');
-const { rejectOperatorKeys } = require('./middleware/validate');
+const { rejectOperatorKeys, requireAppHeader } = require('./middleware/validate');
 const { apiLimiter, loginLimiter, registerLimiter } = require('./middleware/rateLimit');
 const userRoutes = require('./routes/userRoutes');
 const eventRoutes = require('./routes/eventRoutes');
@@ -48,6 +49,8 @@ app.use(
 );
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '100kb' }));
+app.use(cookieParser());
+app.use('/api', requireAppHeader);
 app.use(rejectOperatorKeys);
 app.use('/api', apiLimiter);
 app.use('/api/users/login', loginLimiter);

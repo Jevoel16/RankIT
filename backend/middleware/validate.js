@@ -27,4 +27,15 @@ const rejectOperatorKeys = (req, res, next) => {
   return next();
 };
 
-module.exports = { z, validateBody, rejectOperatorKeys };
+// CSRF backstop on top of SameSite=Lax: browsers can't add custom headers to cross-site
+// form posts, and cross-origin fetches with them need a CORS preflight we don't grant.
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+const requireAppHeader = (req, res, next) => {
+  if (UNSAFE_METHODS.has(req.method) && req.get('X-Requested-With') !== 'RankIT') {
+    return res.status(403).json({ message: 'Missing request header.' });
+  }
+  return next();
+};
+
+module.exports = { z, validateBody, rejectOperatorKeys, requireAppHeader };

@@ -1,36 +1,26 @@
+// Defaults to same-origin /api: the Vite dev proxy and the Vercel rewrite both forward it
+// to the API, which keeps the session cookie first-party.
 function resolveApiBase() {
-  const configured =
-    (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
-    (typeof process !== 'undefined' && process.env && process.env.REACT_APP_API_URL);
-  const hasWindow = typeof window !== 'undefined';
-  const hostname = hasWindow ? window.location.hostname : 'localhost';
-  const protocol = hasWindow ? window.location.protocol : 'http:';
-  const fallback = `${protocol}//${hostname}:5000/api`;
-
-  if (!configured) {
-    return fallback;
-  }
-
-  try {
-    const parsed = new URL(configured);
-    const isLoopbackConfig = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-    const isLoopbackCurrent = hostname === 'localhost' || hostname === '127.0.0.1';
-
-    if (isLoopbackConfig && !isLoopbackCurrent) {
-      parsed.hostname = hostname;
-      return parsed.toString().replace(/\/$/, '');
-    }
-
-    return configured;
-  } catch (_error) {
-    return fallback;
-  }
+  const configured = import.meta.env?.VITE_API_URL;
+  return (configured || '/api').replace(/\/$/, '');
 }
 
 const API_BASE = resolveApiBase();
 
+export const UNAUTHORIZED_EVENT = 'rankit:unauthorized';
+
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, options);
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    credentials: 'include',
+    headers: { 'X-Requested-With': 'RankIT', ...(options.headers || {}) }
+  });
+
+  // An expired or revoked session anywhere in the app sends the user back to sign in.
+  if (response.status === 401 && !path.startsWith('/users/login') && !path.startsWith('/users/me')) {
+    window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
+  }
+
   const contentType = response.headers.get('content-type') || '';
   let payload = null;
   let rawText = '';
@@ -57,6 +47,14 @@ async function request(path, options = {}) {
   return payload ?? rawText;
 }
 
+export function fetchCurrentUser() {
+  return request('/users/me');
+}
+
+export function logout() {
+  return request('/users/logout', { method: 'POST' });
+}
+
 export function login(username, password) {
   return request('/users/login', {
     method: 'POST',
@@ -73,166 +71,136 @@ export function register(body) {
   });
 }
 
-export function fetchPendingUsers(token) {
-  return request('/users/pending', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchPendingUsers() {
+  return request('/users/pending');
 }
 
-export function updateUserApproval(userId, decision, token) {
+export function updateUserApproval(userId, decision) {
   return request(`/users/${userId}/approval`, {
     method: 'PATCH',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({ decision })
   });
 }
 
-export function adminCreateUser(body, token) {
+export function adminCreateUser(body) {
   return request('/users/admin-create', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });
 }
 
-export function fetchUsers(token) {
-  return request('/users', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchUsers() {
+  return request('/users');
 }
 
-export function fetchEvents(token) {
-  return request('/events', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchEvents() {
+  return request('/events');
 }
 
-export function fetchContestants(eventId, token) {
-  return request(`/contestants?eventId=${encodeURIComponent(eventId)}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchContestants(eventId) {
+  return request(`/contestants?eventId=${encodeURIComponent(eventId)}`);
 }
 
-export function fileContestantGrievance(contestantId, body, token) {
+export function fileContestantGrievance(contestantId, body) {
   return request(`/contestants/${contestantId}/deduct`, {
     method: 'PATCH',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });
 }
 
-export function createContestant(body, token) {
+export function createContestant(body) {
   return request('/contestants', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });
 }
 
-export function updateContestant(contestantId, body, token) {
+export function updateContestant(contestantId, body) {
   return request(`/contestants/${encodeURIComponent(contestantId)}`, {
     method: 'PATCH',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });
 }
 
-export function bulkCreateContestants(body, token) {
+export function bulkCreateContestants(body) {
   return request('/contestants/bulk', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });
 }
 
-export function createEvent(body, token) {
+export function createEvent(body) {
   return request('/events', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });
 }
 
-export function fetchEventUnlockStatus(eventId, token) {
-  return request(`/events/${eventId}/unlock-status`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchEventUnlockStatus(eventId) {
+  return request(`/events/${eventId}/unlock-status`);
 }
 
-export function patchEventStatus(eventId, eventStatus, token) {
+export function patchEventStatus(eventId, eventStatus) {
   return request(`/events/${eventId}/status`, {
     method: 'PATCH',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({ eventStatus })
   });
 }
 
-export function fetchMasterEventResults(eventId, token) {
-  return request(`/scores/master/${eventId}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchMasterEventResults(eventId) {
+  return request(`/scores/master/${eventId}`);
 }
 
-export function recordOfflineScore(body, token) {
+export function recordOfflineScore(body) {
   return request('/scores/record', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });
 }
 
-export function fetchEventScores(eventId, token) {
-  return request(`/scores/event/${eventId}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchEventScores(eventId) {
+  return request(`/scores/event/${eventId}`);
 }
 
-export function generateSportsTop4Pairings(eventId, token) {
+export function generateSportsTop4Pairings(eventId) {
   return request(`/scores/sports/${encodeURIComponent(eventId)}/top4-pairings`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
   });
 }
 
-export function fetchAuditLogs(token) {
-  return request('/audits', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchAuditLogs() {
+  return request('/audits');
 }
 
-export function fetchAnalyticsOverview(token) {
-  return request('/analytics/overview', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchAnalyticsOverview() {
+  return request('/analytics/overview');
 }
 
 export function fetchPublicLeaderboard(category = '', eventId = '') {
@@ -258,22 +226,16 @@ export function fetchPublicCategoryRankings(categoryName) {
   return request(`/public/rankings/category/${encodeURIComponent(categoryName)}`);
 }
 
-export function fetchCategoryRankings(categoryName, token) {
-  return request(`/rankings/category/${encodeURIComponent(categoryName)}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchCategoryRankings(categoryName) {
+  return request(`/rankings/category/${encodeURIComponent(categoryName)}`);
 }
 
-export function fetchOverallRankings(token) {
-  return request('/rankings/overall', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchOverallRankings() {
+  return request('/rankings/overall');
 }
 
-export async function fetchAdminBackup(token) {
-  const response = await fetch(`${API_BASE}/admin/backup`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export async function fetchAdminBackup() {
+  const response = await fetch(`${API_BASE}/admin/backup`, { credentials: 'include' });
 
   if (!response.ok) {
     const fallback = `HTTP ${response.status} ${response.statusText}`;
@@ -283,60 +245,52 @@ export async function fetchAdminBackup(token) {
   return response.blob();
 }
 
-export function fetchApprovedUsersByRole(role, token) {
+export function fetchApprovedUsersByRole(role) {
   const params = new URLSearchParams();
   params.set('role', role);
 
-  return request(`/assignments/users?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+  return request(`/assignments/users?${params.toString()}`);
 }
 
-export function assignEventTabulator(eventId, tabulatorId, token) {
+export function assignEventTabulator(eventId, tabulatorId) {
   return request(`/assignments/events/${eventId}/tabulator`, {
     method: 'PUT',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({ tabulatorId })
   });
 }
 
-export function logPdfDownload(reportType, eventId, token) {
+export function logPdfDownload(reportType, eventId) {
   return request('/admin/log-pdf-download', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({ reportType, eventId })
   });
 }
 
-export function fetchCommunityAccess(token) {
-  return request('/admin/community-access', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+export function fetchCommunityAccess() {
+  return request('/admin/community-access');
 }
 
-export function updateCommunityAccess(body, token) {
+export function updateCommunityAccess(body) {
   return request('/admin/community-access', {
     method: 'PATCH',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });
 }
 
-export function updateCommunityEventAccess(eventId, body, token) {
+export function updateCommunityEventAccess(eventId, body) {
   return request(`/admin/community-access/events/${encodeURIComponent(eventId)}`, {
     method: 'PATCH',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
   });

@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+const { COOKIE_NAME, verifySessionToken, clearSessionCookie } = require('../utils/authCookie');
 const User = require('../models/User');
 const Event = require('../models/Event');
 
@@ -16,24 +16,19 @@ const resolveEventId = (req, source) => {
 
 const authenticate = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization || '';
+    const token = req.cookies?.[COOKIE_NAME];
 
-    if (!authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'Missing or invalid authorization header.' });
+    if (!token) {
+      return res.status(401).json({ message: 'Not signed in.' });
     }
 
-    const token = authHeader.split(' ')[1];
-    const secret = process.env.JWT_SECRET;
-
-    if (!secret) {
-      return res.status(500).json({ message: 'JWT secret is not configured.' });
-    }
-
-    const payload = jwt.verify(token, secret, { algorithms: ['HS256'] });
+    const payload = verifySessionToken(token);
     const user = await User.findById(payload.userId).select('-password');
 
-    if (!user) {
-      return res.status(401).json({ message: 'User for token no longer exists.' });
+    // A password or role change bumps tokenVersion and revokes older sessions.
+    if (!user || !user.isApproved || (user.tokenVersion || 0) !== (payload.tv || 0)) {
+      clearSessionCookie(res);
+      return res.status(401).json({ message: 'Session expired. Please sign in again.' });
     }
 
     req.user = user;

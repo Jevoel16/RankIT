@@ -8,6 +8,8 @@ const {
 } = require('../controllers/userController');
 const {
     registerUser,
+    logoutUser,
+    getCurrentUser,
     loginUser,
     getPendingUsers,
     updateApproval,
@@ -19,6 +21,8 @@ const schemas = require('../validation/schemas');
 
 router.post('/register', validateBody(schemas.register), registerUser);
 router.post('/login', validateBody(schemas.login), loginUser);
+router.post('/logout', logoutUser);
+router.get('/me', authenticate, getCurrentUser);
 router.get('/pending', authenticate, authorize('admin', 'superadmin'), getPendingUsers);
 router.patch('/:id/approval', authenticate, authorize('admin', 'superadmin'), validateBody(schemas.approval), updateApproval);
 router.post('/admin-create', authenticate, authorize('admin', 'superadmin'), validateBody(schemas.adminCreateUser), adminCreateUser);

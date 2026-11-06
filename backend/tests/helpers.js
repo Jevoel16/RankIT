@@ -32,13 +32,14 @@ const createUser = async (name, role, { approved = true } = {}) => {
   });
 };
 
-// Returns a supertest agent that keeps the auth cookie between requests.
+const APP_HEADER = { 'X-Requested-With': 'RankIT' };
+
+// Returns a supertest agent that keeps the session cookie and sends the app header.
 const loginAs = async (app, user) => {
-  const agent = request.agent(app);
+  const agent = request.agent(app).set(APP_HEADER);
   const res = await agent.post('/api/users/login').send({ username: user.username, password: PASSWORD });
   if (res.status !== 200) throw new Error(`login failed for ${user.username}: ${res.status} ${res.text}`);
-  agent.token = res.body.token;
   return agent;
 };
 
-module.exports = { PASSWORD, startApp, stopApp, createUser, loginAs, request };
+module.exports = { APP_HEADER, PASSWORD, startApp, stopApp, createUser, loginAs, request };

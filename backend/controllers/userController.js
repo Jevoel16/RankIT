@@ -78,7 +78,10 @@ const updateUser = async (req, res) => {
             updates.password = await bcrypt.hash(password, 12);
         }
 
-        const updatedUser = await User.findByIdAndUpdate(req.params.id, updates, {
+        // Revoke existing sessions when credentials or permissions change.
+        const revokeSessions = Boolean(password || role);
+
+        const updatedUser = await User.findByIdAndUpdate(req.params.id, revokeSessions ? { ...updates, $inc: { tokenVersion: 1 } } : updates, {
             new: true,
             runValidators: true
         }).select('-password');

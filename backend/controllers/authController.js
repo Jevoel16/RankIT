@@ -1,22 +1,8 @@
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+const { signSessionToken, setSessionCookie, clearSessionCookie } = require('../utils/authCookie');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
 const { sendClientError } = require('../utils/httpErrors');
-
-const createToken = (userId) => {
-  const secret = process.env.JWT_SECRET;
-
-  if (!secret) {
-    throw new Error('JWT secret is not configured.');
-  }
-
-  return jwt.sign(
-    { userId },
-    secret,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '12h', algorithm: 'HS256' }
-  );
-};
 
 const writeAudit = async ({ action, actorId, entityType, entityId, metadata }) => {
   try {
@@ -119,7 +105,7 @@ const loginUser = async (req, res) => {
     });
   }
 
-  const token = createToken(user._id.toString());
+  setSessionCookie(res, signSessionToken(user));
 
   // Log login audit entry
   await writeAudit({
@@ -135,7 +121,6 @@ const loginUser = async (req, res) => {
   });
 
   return res.json({
-    token,
     user: {
       id: user._id,
       username: user.username,
@@ -267,8 +252,25 @@ const adminCreateUser = async (req, res) => {
   }
 };
 
+const logoutUser = (req, res) => {
+  clearSessionCookie(res);
+  return res.json({ message: 'Signed out.' });
+};
+
+const getCurrentUser = (req, res) =>
+  res.json({
+    user: {
+      id: req.user._id,
+      username: req.user.username,
+      role: req.user.role,
+      isApproved: req.user.isApproved
+    }
+  });
+
 module.exports = {
   registerUser,
+  logoutUser,
+  getCurrentUser,
   loginUser,
   getPendingUsers,
   updateApproval,
