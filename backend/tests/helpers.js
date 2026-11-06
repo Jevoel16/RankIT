@@ -21,14 +21,13 @@ const stopApp = async () => {
   if (mongo) await mongo.stop();
 };
 
-const createUser = async (name, role, { approved = true } = {}) => {
+const createUser = async (name, role, { disabled = false } = {}) => {
   const User = require('../models/User');
   return User.create({
     username: name,
     password: await bcrypt.hash(PASSWORD, 4),
     role,
-    isApproved: approved,
-    approvalStatus: approved ? 'approved' : 'pending'
+    disabled
   });
 };
 

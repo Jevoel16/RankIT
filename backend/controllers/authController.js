@@ -2,7 +2,6 @@ const bcrypt = require('bcryptjs');
 const { signSessionToken, setSessionCookie, clearSessionCookie } = require('../utils/authCookie');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
-const { sendClientError } = require('../utils/httpErrors');
 
 const writeAudit = async ({ action, actorId, entityType, entityId, metadata }) => {
   try {
@@ -12,245 +11,36 @@ const writeAudit = async ({ action, actorId, entityType, entityId, metadata }) =
   }
 };
 
-const registerUser = async (req, res) => {
-  try {
-    const { username, password, role } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({ message: 'username and password are required.' });
-    }
-
-    const allowedSelfRegisterRoles = ['tabulator', 'grievance'];
-    const requestedRole = role || 'tabulator';
-
-    if (!allowedSelfRegisterRoles.includes(requestedRole)) {
-      return res.status(403).json({
-        message: 'Only tabulator and grievance roles can register directly. Admin accounts are created by superadmin.'
-      });
-    }
-
-    // Format domain-based username: username@role.rankit
-    const baseUsername = username.split('@')[0].toLowerCase().trim();
-    const domainUsername = `${baseUsername}@${requestedRole}.rankit`;
-
-    const existingUser = await User.findOne({ username: domainUsername });
-    if (existingUser) {
-      return res.status(409).json({ message: 'Username already exists. Please choose a different username.' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const user = await User.create({
-      username: domainUsername,
-      password: hashedPassword,
-      role: requestedRole,
-      isApproved: false,
-      approvalStatus: 'pending'
-    });
-
-    // Log registration audit entry
-    await writeAudit({
-      action: 'USER_REGISTERED',
-      actorId: user._id,
-      entityType: 'user',
-      entityId: user._id,
-      metadata: {
-        username: user.username,
-        role: user.role,
-        identityFormat: 'domain-based',
-        approvalStatus: 'pending'
-      }
-    });
-
-    return res.status(201).json({
-      message: 'Registration submitted. Pending Admin Approval.',
-      user: {
-        id: user._id,
-        username: user.username,
-        role: user.role,
-        isApproved: user.isApproved,
-        approvalStatus: user.approvalStatus
-      }
-    });
-  } catch (error) {
-    return sendClientError(res, error);
-  }
-};
-
+// Accounts are created only through Google/GitHub sign-in; this is the alternative
+// username + password sign-in for accounts that finished the password step.
 const loginUser = async (req, res) => {
   const { username, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ message: 'username and password are required.' });
-  }
+  const user = await User.findOne({ username: username.toLowerCase().trim() });
 
-  // Accept both formats: "user" (will search as user@role.rankit for all roles) or "user@role.rankit"
-  let searchUsername = username.toLowerCase().trim();
-  
-  // If user provided without domain, we need to validate against domain format
-  // For now, accept full domain format
-  let user = await User.findOne({ username: searchUsername });
-  
-  // OAuth-only accounts have no password to compare against.
-  if (!user || !user.password) {
+  // Accounts that never set a password have nothing to compare against.
+  if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
     return res.status(401).json({ message: 'Invalid credentials.' });
   }
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) {
-    return res.status(401).json({ message: 'Invalid credentials.' });
+  if (user.disabled) {
+    return res.status(403).json({ message: 'Account disabled. Contact an admin.' });
   }
-
-  if (!user.isApproved) {
-    return res.status(403).json({
-      message: user.approvalStatus === 'rejected' ? 'Account rejected by admin.' : 'Pending Admin Approval.'
-    });
+  if (user.role === 'pending') {
+    return res.status(403).json({ message: 'Waiting for an admin to assign your role.' });
   }
 
   setSessionCookie(res, signSessionToken(user));
 
-  // Log login audit entry
   await writeAudit({
     action: 'USER_LOGGED_IN',
     actorId: user._id,
     entityType: 'user',
     entityId: user._id,
-    metadata: {
-      username: user.username,
-      role: user.role,
-      timestamp: new Date().toISOString()
-    }
+    metadata: { username: user.username, role: user.role }
   });
 
-  return res.json({
-    user: {
-      id: user._id,
-      username: user.username,
-      role: user.role,
-      isApproved: user.isApproved
-    }
-  });
-};
-
-const getPendingUsers = async (req, res) => {
-  let allowedRoles = [];
-
-  if (req.user.role === 'superadmin') {
-    allowedRoles = ['admin', 'tabulator', 'grievance'];
-  } else if (req.user.role === 'admin') {
-    allowedRoles = ['tabulator', 'grievance'];
-  }
-
-  const users = await User.find({
-    approvalStatus: 'pending',
-    role: { $in: allowedRoles }
-  })
-    .select('-password')
-    .sort({ createdAt: 1 });
-
-  return res.json(users);
-};
-
-const updateApproval = async (req, res) => {
-  try {
-    const { decision } = req.body;
-
-    if (!['approve', 'reject'].includes(decision)) {
-      return res.status(400).json({ message: 'decision must be approve or reject.' });
-    }
-
-    const targetUser = await User.findById(req.params.id).select('-password');
-    if (!targetUser) {
-      return res.status(404).json({ message: 'User not found.' });
-    }
-
-    const approverRole = req.user.role;
-    const canSuperadminApprove = approverRole === 'superadmin' && ['admin', 'tabulator', 'grievance'].includes(targetUser.role);
-    const canAdminApprove =
-      approverRole === 'admin' && ['tabulator', 'grievance'].includes(targetUser.role);
-
-    if (!canSuperadminApprove && !canAdminApprove) {
-      return res.status(403).json({
-        message: 'Forbidden: you can only approve allowed roles for your account type.'
-      });
-    }
-
-    const isApprove = decision === 'approve';
-
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      {
-        isApproved: isApprove,
-        approvalStatus: isApprove ? 'approved' : 'rejected'
-      },
-      { new: true, runValidators: true }
-    ).select('-password');
-
-    await writeAudit({
-      action: isApprove ? 'ADMIN_APPROVED_USER' : 'ADMIN_REJECTED_USER',
-      actorId: req.user._id,
-      entityType: 'user',
-      entityId: user._id,
-      metadata: { username: user.username, role: user.role }
-    });
-
-    return res.json(user);
-  } catch (error) {
-    return sendClientError(res, error);
-  }
-};
-
-const adminCreateUser = async (req, res) => {
-  try {
-    const { username, password, role } = req.body;
-
-    if (!username || !password || !role) {
-      return res.status(400).json({ message: 'username, password, and role are required.' });
-    }
-
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      return res.status(409).json({ message: 'Username already exists.' });
-    }
-
-    if (role === 'admin' && req.user.role !== 'superadmin') {
-      return res.status(403).json({ message: 'Only superadmin can create admin accounts.' });
-    }
-
-    if (!['tabulator', 'grievance', 'admin'].includes(role)) {
-      return res.status(403).json({ message: 'Only tabulator, grievance, and admin accounts can be created here.' });
-    }
-
-    if (role === 'superadmin') {
-      return res.status(403).json({ message: 'Creating superadmin accounts is not allowed.' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 12);
-    const user = await User.create({
-      username,
-      password: hashedPassword,
-      role,
-      isApproved: true,
-      approvalStatus: 'approved'
-    });
-
-    await writeAudit({
-      action: 'ADMIN_CREATED_USER_BYPASS_APPROVAL',
-      actorId: req.user._id,
-      entityType: 'user',
-      entityId: user._id,
-      metadata: { username: user.username, role: user.role }
-    });
-
-    return res.status(201).json({
-      id: user._id,
-      username: user.username,
-      role: user.role,
-      isApproved: user.isApproved,
-      approvalStatus: user.approvalStatus
-    });
-  } catch (error) {
-    return sendClientError(res, error);
-  }
+  return res.json({ user: { id: user._id, username: user.username, role: user.role } });
 };
 
 const logoutUser = (req, res) => {
@@ -259,21 +49,6 @@ const logoutUser = (req, res) => {
 };
 
 const getCurrentUser = (req, res) =>
-  res.json({
-    user: {
-      id: req.user._id,
-      username: req.user.username,
-      role: req.user.role,
-      isApproved: req.user.isApproved
-    }
-  });
+  res.json({ user: { id: req.user._id, username: req.user.username, role: req.user.role } });
 
-module.exports = {
-  registerUser,
-  logoutUser,
-  getCurrentUser,
-  loginUser,
-  getPendingUsers,
-  updateApproval,
-  adminCreateUser
-};
+module.exports = { loginUser, logoutUser, getCurrentUser };

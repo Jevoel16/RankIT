@@ -1,11 +1,14 @@
 import AdminContestants from '../../components/AdminContestants';
-import { CreateUserForm, PendingApprovals } from '../../components/AdminUsers';
+import { NewSignups, PeoplePanel } from '../../components/AdminUsers';
 import ConsoleLayout from '../../components/ConsoleLayout';
 import { useToast } from '../../components/ui';
 import useEvents from '../../hooks/useEvents';
+import AnalyticsPanel from './AnalyticsPanel';
 import AssignTabulatorPanel from './AssignTabulatorPanel';
+import AuditTrailPanel from './AuditTrailPanel';
 import CreateEventPanel from './CreateEventPanel';
 import { BackupPanel, CommunityAccessPanel, MasterReportPanel } from './SettingsPanels';
+import UserDirectoryPanel from './UserDirectoryPanel';
 
 export default function AdminPage() {
   const toast = useToast();
@@ -15,7 +18,7 @@ export default function AdminPage() {
     <ConsoleLayout
       consoleId="admin"
       title="Event Configuration"
-      subtitle="Set up events, people and what the public sees."
+      subtitle="Set up events, assign roles and choose what the public sees."
       sections={[
         {
           id: 'events',
@@ -34,18 +37,13 @@ export default function AdminPage() {
           id: 'users',
           label: 'Users',
           subtabs: [
-            {
-              id: 'approval',
-              label: 'Approvals',
-              render: () => <PendingApprovals />
-            },
-            {
-              id: 'create',
-              label: 'Create user',
-              render: () => <CreateUserForm />
-            }
+            { id: 'signups', label: 'New sign-ups', render: () => <NewSignups /> },
+            { id: 'people', label: 'People', render: () => <PeoplePanel /> },
+            { id: 'directory', label: 'Directory', render: () => <UserDirectoryPanel /> }
           ]
         },
+        { id: 'analytics', label: 'Analytics', render: () => <AnalyticsPanel /> },
+        { id: 'audit', label: 'Audit trail', render: () => <AuditTrailPanel /> },
         {
           id: 'settings',
           label: 'Settings',

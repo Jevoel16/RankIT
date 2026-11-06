@@ -6,14 +6,14 @@ const { authenticate, authorize } = require('../middleware/authMiddleware');
 router.get(
   '/category/:categoryName',
   authenticate,
-  authorize('admin', 'superadmin', 'tabulator', 'grievance'),
+  authorize('admin', 'tabulator', 'grievance'),
   getCategoryRankings
 );
 
 router.get(
   '/overall',
   authenticate,
-  authorize('admin', 'superadmin', 'tabulator', 'grievance'),
+  authorize('admin', 'tabulator', 'grievance'),
   getOverallRankings
 );
 

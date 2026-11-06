@@ -1,4 +1,5 @@
 import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
+import { ROLE_LABELS, accountStatus } from '../utils/roles';
 
 const styles = StyleSheet.create({
   page: {
@@ -103,7 +104,7 @@ export default function UsersDirectoryPDF({
               <Text style={styles.headerCellText}>Role</Text>
             </View>
             <View style={styles.cellApproved}>
-              <Text style={styles.headerCellText}>Approved</Text>
+              <Text style={styles.headerCellText}>Sign-in</Text>
             </View>
             <View style={styles.cellStatus}>
               <Text style={styles.headerCellText}>Status</Text>
@@ -114,17 +115,17 @@ export default function UsersDirectoryPDF({
             <Text style={styles.emptyState}>No users match the selected filters.</Text>
           ) : (
             pageRows.map((user) => {
-              const status = user.approvalStatus || (user.isApproved ? 'approved' : 'pending');
+              const status = accountStatus(user);
               return (
                 <View style={styles.tableRow} key={user._id || user.id || user.username}>
                   <View style={styles.cellUsername}>
                     <Text style={styles.rowCellText}>{user.username || '-'}</Text>
                   </View>
                   <View style={styles.cellRole}>
-                    <Text style={styles.rowCellText}>{user.role || '-'}</Text>
+                    <Text style={styles.rowCellText}>{ROLE_LABELS[user.role] || user.role || '-'}</Text>
                   </View>
                   <View style={styles.cellApproved}>
-                    <Text style={styles.rowCellText}>{user.isApproved ? 'Yes' : 'No'}</Text>
+                    <Text style={styles.rowCellText}>{(user.providers || []).join(', ') || 'Password'}</Text>
                   </View>
                   <View style={styles.cellStatus}>
                     <Text style={styles.rowCellText}>{status}</Text>

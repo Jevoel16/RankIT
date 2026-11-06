@@ -1,4 +1,5 @@
-// Creates (or resets) the first superadmin in any database, including production Atlas.
+// Creates (or resets) the superadmin in any database, including production Atlas.
+// It is the only account not created through Google/GitHub sign-in; its sole job is recovering admins.
 // Usage: npm run create:superadmin
 // Reads SUPERADMIN_USERNAME / SUPERADMIN_PASSWORD from the environment, otherwise prompts.
 const path = require('path');
@@ -31,7 +32,7 @@ async function main() {
     throw new Error('MONGODB_URI is required (backend/.env or environment).');
   }
 
-  const baseName = (process.env.SUPERADMIN_USERNAME || (await ask('Superadmin username (without @domain): ')))
+  const baseName = (process.env.SUPERADMIN_USERNAME || (await ask('Superadmin username: ')))
     .split('@')[0]
     .toLowerCase();
   if (!/^[a-z0-9._-]{3,40}$/.test(baseName)) {
@@ -44,7 +45,9 @@ async function main() {
   }
 
   await mongoose.connect(process.env.MONGODB_URI);
-  const username = `${baseName}@superadmin.rankit`;
+  const username = baseName;
+  const taken = await User.findOne({ username, role: { $ne: 'superadmin' } }).select('_id');
+  if (taken) throw new Error(`"${username}" already belongs to another account. Pick another name.`);
   await User.updateOne(
     { username },
     {
@@ -52,8 +55,7 @@ async function main() {
         username,
         password: await bcrypt.hash(password, 12),
         role: 'superadmin',
-        isApproved: true,
-        approvalStatus: 'approved'
+        disabled: false
       },
       $inc: { tokenVersion: 1 }
     },

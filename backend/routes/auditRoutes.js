@@ -6,8 +6,8 @@ const {
 } = require('../controllers/auditController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 
-router.get('/', authenticate, authorize('superadmin'), getAudits);
+router.get('/', authenticate, authorize('admin'), getAudits);
 
-router.get('/:id', authenticate, authorize('superadmin'), getAuditById);
+router.get('/:id', authenticate, authorize('admin'), getAuditById);
 
 module.exports = router;

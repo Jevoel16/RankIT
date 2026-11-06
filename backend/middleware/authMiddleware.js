@@ -1,5 +1,6 @@
 const { COOKIE_NAME, verifySessionToken, clearSessionCookie } = require('../utils/authCookie');
 const User = require('../models/User');
+const { isActive } = User;
 const Event = require('../models/Event');
 
 // Only a single string id counts: repeated query params arrive as arrays, and Mongoose would
@@ -27,25 +28,26 @@ const authenticate = async (req, res, next) => {
     }
 
     const payload = verifySessionToken(token);
-    const user = await User.findById(payload.userId).select('-password');
+    const user = await User.findById(payload.userId);
 
-    // A password or role change bumps tokenVersion and revokes older sessions.
-    if (!user || !user.isApproved || (user.tokenVersion || 0) !== (payload.tv || 0)) {
+    // A password, role or status change bumps tokenVersion and revokes older sessions.
+    if (!isActive(user) || (user.tokenVersion || 0) !== (payload.tv || 0)) {
       clearSessionCookie(res);
       return res.status(401).json({ message: 'Session expired. Please sign in again.' });
     }
 
-    req.user = user;
+    // Keep the hash off req.user; nothing downstream needs it.
+    const plain = user.toObject();
+    delete plain.password;
+    req.user = plain;
     next();
   } catch (error) {
     return res.status(401).json({ message: 'Unauthorized request.' });
   }
 };
 
-// Superadmin inherits every route that admins can use.
-const authorize = (...roles) => {
-  const allowedRoles = roles.includes('admin') && !roles.includes('superadmin') ? [...roles, 'superadmin'] : roles;
-
+// Roles are exact: superadmin only reaches its own recovery routes, never admin ones.
+const authorize = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized request.' });
@@ -61,7 +63,7 @@ const authorize = (...roles) => {
 
 const authorizeEventAssignment = ({
   eventIdSource = 'params',
-  allowAdminRoles = ['admin', 'superadmin'],
+  allowAdminRoles = ['admin'],
   allowedAssignedRoles = ['tabulator']
 } = {}) => {
   return async (req, res, next) => {

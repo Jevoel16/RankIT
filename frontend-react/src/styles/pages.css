@@ -144,7 +144,8 @@
   border: 1px solid var(--border);
 }
 
-.status-badge--approved {
+.status-badge--approved,
+.status-badge--active {
   color: var(--ok);
 }
 
@@ -152,7 +153,8 @@
   color: var(--warn);
 }
 
-.status-badge--rejected {
+.status-badge--rejected,
+.status-badge--disabled {
   color: var(--danger);
 }
 
@@ -615,13 +617,10 @@
   border-radius: var(--radius-md);
 }
 
-.auth__tabs {
-  justify-content: stretch;
-}
-
-.auth__tabs .ui-tab {
-  flex: 1;
-  justify-content: center;
+.auth__done {
+  display: grid;
+  gap: var(--space-4);
+  text-align: center;
 }
 
 /* ---------- Public rankings ---------- */
@@ -1310,7 +1309,6 @@
 .oauth {
   display: grid;
   gap: var(--space-3);
-  margin-top: var(--space-5);
 }
 
 .oauth__divider {

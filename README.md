@@ -3,7 +3,7 @@
   <h1>RankIT</h1>
   <p>Live, role-based tabulation and rankings for school events.</p>
 
-[![Version](https://img.shields.io/badge/version-2.7.0-blue?style=flat)](backend/package.json)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue?style=flat)](backend/package.json)
 [![License](https://img.shields.io/badge/license-Sprucetrap%20Source--Available-lightgrey?style=flat)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jevoel16/RankIT/ci.yml?branch=V2.0-RankIT&label=CI&style=flat)](https://github.com/Jevoel16/RankIT/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-web-informational?style=flat)](#getting-started)
@@ -39,7 +39,7 @@ RankIT runs the scoring side of school competitions: admins set up events and cr
     <td width="50%" align="center"><b>Grievance deductions</b><br><a href="docs/images/grievance-deductions.png"><img src="docs/images/grievance-deductions.png" width="100%" alt="Standings table with raw average, deductions and final score"></a></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><b>Superadmin analytics</b><br><a href="docs/images/superadmin-analytics.png"><img src="docs/images/superadmin-analytics.png" width="100%" alt="Platform totals and users-by-role donut chart"></a></td>
+    <td width="50%" align="center"><b>Admin analytics</b><br><a href="docs/images/superadmin-analytics.png"><img src="docs/images/superadmin-analytics.png" width="100%" alt="Platform totals and users-by-role donut chart"></a></td>
     <td width="50%" align="center"><b>Light theme</b><br><a href="docs/images/community-light.png"><img src="docs/images/community-light.png" width="100%" alt="Public leaderboard in the light theme"></a></td>
   </tr>
   <tr>
@@ -58,12 +58,14 @@ RankIT runs the scoring side of school competitions: admins set up events and cr
 
 - Public live leaderboard by event, category and overall weighted ranking
 - Big-screen display mode for projectors, with auto-rotating views and a QR code
-- Role consoles for superadmin, admin, tabulator and grievance staff, built for phones and tablets
+- Role consoles for admin, tabulator and grievance staff, built for phones and tablets
 - Criteria-based and set-based (sports) scoring with automatic rankings
-- Staff sign-in with a password, Google or GitHub; new accounts wait for admin approval
+- Accounts are created by signing in with Google or GitHub; admins assign each person's role
+- Sign in later with Google, GitHub or a username and password set at first sign-in
+- A superadmin can only recover admin access: promote an admin or reset an admin's password
 - Auditable grievance deductions with reasons
 - Master report PDFs: main results, deduction notes, weighted rankings
-- Audit trail and analytics for superadmins
+- Audit trail and analytics for admins
 - Light, dark and system themes; works on phones and tablets
 
 [Back to top](#rankit)
@@ -96,7 +98,7 @@ npm run dev --prefix backend                   # API on http://localhost:5000
 npm start --prefix frontend-react              # app on http://localhost:3000
 ```
 
-The seeders create demo accounts such as `mark@admin.rankit` and `al@tabulator.rankit` with the password from `SEED_PASSWORD` (default `1234`). They only run against a local database.
+The seeders create demo accounts such as `mark` (admin) and `al` (tabulator) with the password from `SEED_PASSWORD` (default `1234`). They only run against a local database.
 
 [Back to top](#rankit)
 
@@ -137,7 +139,7 @@ The API reads `backend/.env`; see [`backend/.env.example`](backend/.env.example)
 4. **Everyone** follows the public page at `/`; admins choose which events and ranking views are visible. Put `/display` (or `/display/<eventId>`) on a projector: it rotates event, category and overall standings every 15 seconds (`?seconds=20`, `?rotate=0` to pin). Press F for full screen, Space to pause.
 5. **Admin** prints the master report when the event is finalized.
 
-Google/GitHub sign-in is optional; setup steps and the logos to upload are in [docs/deployment.md](docs/deployment.md#3-google-and-github-sign-in-optional).
+New staff sign in with Google or GitHub, set a password, and wait while an **admin** assigns their role under **Users → New sign-ups**. Setup steps and the logos to upload are in [docs/deployment.md](docs/deployment.md#3-google-and-github-sign-in).
 
 Deploying: import the repo into Vercel as one project (root directory = repo root); see [docs/deployment.md](docs/deployment.md).
 
@@ -169,7 +171,8 @@ docs/             Deployment guide, screenshots, brand assets (logo exports for 
 | backend | `npm test` | API tests (in-memory MongoDB) |
 | backend | `npm run lint` | ESLint |
 | backend | `npm run seed:users` / `seed:events` | Local demo data |
-| backend | `npm run create:superadmin` | First superadmin for any database |
+| backend | `npm run create:superadmin` | Superadmin (admin recovery) for any database |
+| backend | `npm run migrate:accounts` | One-off upgrade of pre-3.0 accounts (`-- --dry-run` to preview) |
 | frontend-react | `npm start` | Dev server with `/api` proxy |
 | frontend-react | `npm test` / `npm run lint` | Unit tests / ESLint |
 | frontend-react | `npm run build` / `npm run preview` | Production build / serve it with production headers |

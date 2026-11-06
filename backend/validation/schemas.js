@@ -3,12 +3,6 @@ const { z } = require('zod');
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'must be a valid id');
 const nullableObjectId = z.union([objectId, z.literal(''), z.null()]).transform((value) => value || null);
 
-const username = z
-  .string()
-  .trim()
-  .min(3, 'must be at least 3 characters')
-  .max(64)
-  .regex(/^[a-z0-9._@-]+$/i, 'may only contain letters, numbers, dots, dashes, underscores and @');
 const newPassword = z.string().min(8, 'must be at least 8 characters').max(128);
 const name = z.string().trim().min(1, 'is required').max(120);
 
@@ -44,27 +38,15 @@ module.exports = {
     username: z.string().trim().min(1, 'is required').max(100),
     password: z.string().min(1, 'is required').max(200)
   }),
-  register: z.object({
-    username,
-    password: newPassword,
-    role: z.enum(['tabulator', 'grievance']).optional()
-  }),
-  adminCreateUser: z.object({
-    username,
-    password: newPassword,
-    role: z.enum(['tabulator', 'grievance', 'admin'])
-  }),
-  approval: z.object({ decision: z.enum(['approve', 'reject']) }),
-  createUser: z.object({
-    username,
-    password: newPassword,
-    role: z.enum(['tabulator', 'grievance', 'admin'])
-  }),
-  updateUser: z.object({
-    username: username.optional(),
-    password: newPassword.optional(),
-    role: z.enum(['tabulator', 'grievance', 'admin']).optional()
-  }),
+  setupPassword: z
+    .object({ password: newPassword, confirmPassword: z.string().max(128) })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: 'Passwords do not match.',
+      path: ['confirmPassword']
+    }),
+  assignRole: z.object({ role: z.enum(['tabulator', 'grievance', 'admin']) }),
+  userStatus: z.object({ disabled: z.boolean() }),
+  resetPassword: z.object({ password: newPassword }),
 
   createEvent: z.object(eventFields),
   updateEvent: z.object(eventFields).partial(),

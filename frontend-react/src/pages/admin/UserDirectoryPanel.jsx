@@ -4,9 +4,7 @@ import PrintReportPreviewModal from '../../components/PrintReportPreviewModal';
 import UsersDirectoryPDF from '../../components/UsersDirectoryPDF';
 import { Button, DataTable, FormField, Skeleton, useToast } from '../../components/ui';
 import { todayStamp } from '../../utils/browser';
-import { ROLE_LABELS } from '../../utils/roles';
-
-const statusOf = (user) => user.approvalStatus || (user.isApproved ? 'approved' : 'pending');
+import { ROLE_LABELS, accountStatus } from '../../utils/roles';
 
 export default function UserDirectoryPanel() {
   const toast = useToast();
@@ -31,7 +29,7 @@ export default function UserDirectoryPanel() {
       (user) =>
         (!keyword || String(user.username).toLowerCase().includes(keyword)) &&
         (role === 'all' || user.role === role) &&
-        (status === 'all' || statusOf(user) === status)
+        (status === 'all' || accountStatus(user) === status)
     );
   }, [users, search, role, status]);
 
@@ -73,9 +71,9 @@ export default function UserDirectoryPanel() {
         <FormField label="Status">
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="all">Any status</option>
-            <option value="approved">Approved</option>
-            <option value="pending">Pending</option>
-            <option value="rejected">Rejected</option>
+            <option value="active">Active</option>
+            <option value="pending">Waiting for a role</option>
+            <option value="disabled">Disabled</option>
           </select>
         </FormField>
         <Button className="filter-bar__action" onClick={() => setPreviewOpen(true)} disabled={rows.length === 0}>
@@ -94,7 +92,9 @@ export default function UserDirectoryPanel() {
           {
             key: 'status',
             header: 'Status',
-            render: (user) => <span className={`status-badge status-badge--${statusOf(user)}`}>{statusOf(user)}</span>
+            render: (user) => (
+              <span className={`status-badge status-badge--${accountStatus(user)}`}>{accountStatus(user)}</span>
+            )
           }
         ]}
       />

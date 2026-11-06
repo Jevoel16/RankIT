@@ -33,9 +33,9 @@ const getOverview = async (_req, res) => {
     talliesByContestant
   ] = await Promise.all([
     User.countDocuments(),
-    User.countDocuments({ isApproved: true }),
-    User.countDocuments({ approvalStatus: 'pending' }),
-    User.countDocuments({ approvalStatus: 'rejected' }),
+    User.countDocuments({ role: { $ne: 'pending' }, disabled: { $ne: true } }),
+    User.countDocuments({ role: 'pending', disabled: { $ne: true } }),
+    User.countDocuments({ disabled: true }),
     Event.countDocuments(),
     Contestant.countDocuments(),
     ScoreSheet.countDocuments(),

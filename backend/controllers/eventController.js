@@ -46,8 +46,7 @@ const validateAssignments = async ({ tabulatorId, assignedTallierIds }) => {
         const tabulator = await User.findOne({
             _id: tabulatorId,
             role: 'tabulator',
-            isApproved: true,
-            approvalStatus: 'approved'
+            disabled: { $ne: true }
         }).select('_id');
 
         if (!tabulator) {
@@ -59,8 +58,7 @@ const validateAssignments = async ({ tabulatorId, assignedTallierIds }) => {
         const tallierCount = await User.countDocuments({
             _id: { $in: assignedTallierIds },
             role: 'tallier',
-            isApproved: true,
-            approvalStatus: 'approved'
+            disabled: { $ne: true }
         });
 
         if (tallierCount !== assignedTallierIds.length) {

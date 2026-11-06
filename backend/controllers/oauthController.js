@@ -1,7 +1,9 @@
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const User = require('../models/User');
+const { isActive } = User;
 const Audit = require('../models/Audit');
 const { PROVIDER_NAMES, getProvider, enabledProviders, normalizeProfile } = require('../config/oauth');
 const { COOKIE_NAME, signSessionToken, verifySessionToken, setSessionCookie } = require('../utils/authCookie');
@@ -9,11 +11,13 @@ const { COOKIE_NAME, signSessionToken, verifySessionToken, setSessionCookie } = 
 const STATE_COOKIE = 'rankit_oauth';
 const STATE_AUDIENCE = 'rankit-oauth';
 const STATE_TTL_SECONDS = 10 * 60;
-const SELF_REGISTER_ROLES = ['tabulator', 'grievance'];
+const SETUP_COOKIE = 'rankit_setup';
+const SETUP_AUDIENCE = 'rankit-setup';
+const SETUP_TTL_SECONDS = 15 * 60;
 
+// "login" signs in, creating the account on first use; "link" adds a provider to the signed-in account.
 const startQuery = z.object({
-  mode: z.enum(['login', 'register', 'link']).default('login'),
-  role: z.enum(SELF_REGISTER_ROLES).default('tabulator')
+  mode: z.enum(['login', 'link']).default('login')
 });
 
 const base64url = (buffer) => buffer.toString('base64url');
@@ -46,7 +50,7 @@ const sessionUser = async (req) => {
   try {
     const payload = verifySessionToken(token);
     const user = await User.findById(payload.userId);
-    if (!user || !user.isApproved || (user.tokenVersion || 0) !== (payload.tv || 0)) return null;
+    if (!isActive(user) || (user.tokenVersion || 0) !== (payload.tv || 0)) return null;
     return user;
   } catch (error) {
     return null;
@@ -62,7 +66,7 @@ const start = async (req, res, next) => {
 
     const parsed = startQuery.safeParse(req.query);
     if (!parsed.success) return fail(res, 'invalid_request');
-    const { mode, role } = parsed.data;
+    const { mode } = parsed.data;
 
     let uid;
     if (mode === 'link') {
@@ -75,7 +79,7 @@ const start = async (req, res, next) => {
     const verifier = base64url(crypto.randomBytes(32));
     const challenge = base64url(crypto.createHash('sha256').update(verifier).digest());
 
-    const stateToken = jwt.sign({ p: provider.name, mode, role, state, verifier, uid }, process.env.JWT_SECRET, {
+    const stateToken = jwt.sign({ p: provider.name, mode, state, verifier, uid }, process.env.JWT_SECRET, {
       expiresIn: STATE_TTL_SECONDS,
       audience: STATE_AUDIENCE,
       algorithm: 'HS256'
@@ -147,21 +151,36 @@ const identityFields = (providerName, profile) =>
     ? { providerId: profile.providerId, email: profile.email }
     : { providerId: profile.providerId, login: profile.login };
 
-const uniqueUsername = async (nameHint, role) => {
+// The provider username (GitHub login, Google email prefix), with a number added if it's taken.
+const uniqueUsername = async (nameHint) => {
   const base =
     String(nameHint || '')
       .toLowerCase()
       .replace(/[^a-z0-9._-]/g, '')
-      .slice(0, 30) || 'user';
+      .slice(0, 34) || 'user';
   for (let i = 0; i < 50; i += 1) {
-    const candidate = `${i === 0 ? base : `${base}${i + 1}`}@${role}.rankit`;
+    const candidate = i === 0 ? base : `${base}${i + 1}`;
     if (!(await User.exists({ username: candidate }))) return candidate;
   }
-  return `${base}${crypto.randomInt(1000, 9999)}@${role}.rankit`;
+  return `${base}${crypto.randomInt(1000, 9999)}`;
 };
 
+const pendingRedirect = (res, user) =>
+  res.redirect(302, `/login?oauth=pending&username=${encodeURIComponent(user.username)}`);
+
 const signIn = async (res, user, providerName) => {
-  if (!user.isApproved) return fail(res, user.approvalStatus === 'rejected' ? 'rejected' : 'pending');
+  if (user.disabled) return fail(res, 'disabled');
+  if (!user.password) {
+    // First sign-in (or an unfinished one): the user picks a password before anything else.
+    const token = jwt.sign({ uid: user._id.toString() }, process.env.JWT_SECRET, {
+      expiresIn: SETUP_TTL_SECONDS,
+      audience: SETUP_AUDIENCE,
+      algorithm: 'HS256'
+    });
+    res.cookie(SETUP_COOKIE, token, { ...stateCookieOptions(), maxAge: SETUP_TTL_SECONDS * 1000 });
+    return res.redirect(302, '/setup-password');
+  }
+  if (user.role === 'pending') return pendingRedirect(res, user);
   setSessionCookie(res, signSessionToken(user));
   await audit('USER_OAUTH_LOGGED_IN', user, { username: user.username, role: user.role, provider: providerName });
   // The login page sends signed-in users on to their role's home.
@@ -202,27 +221,61 @@ const callback = async (req, res, next) => {
     }
 
     if (linkedUser) return signIn(res, linkedUser, provider.name);
-    if (state.mode === 'login') return fail(res, 'not_linked');
 
-    // Register: same approval flow as password sign-ups, limited to self-service roles.
-    const role = SELF_REGISTER_ROLES.includes(state.role) ? state.role : 'tabulator';
+    // First sign-in with this identity creates the account; an admin assigns its role later.
     const user = await User.create({
-      username: await uniqueUsername(profile.nameHint, role),
-      role,
-      isApproved: false,
-      approvalStatus: 'pending',
+      username: await uniqueUsername(profile.nameHint),
+      role: 'pending',
       oauth: { [provider.name]: identityFields(provider.name, profile) }
     });
-    await audit('USER_OAUTH_REGISTERED', user, {
-      username: user.username,
-      role,
-      provider: provider.name,
-      approvalStatus: 'pending'
-    });
-    return res.redirect(302, `/login?oauth=pending&username=${encodeURIComponent(user.username)}`);
+    await audit('USER_OAUTH_REGISTERED', user, { username: user.username, provider: provider.name });
+    return signIn(res, user, provider.name);
   } catch (error) {
     return next(error);
   }
+};
+
+const setupUser = async (req) => {
+  const token = req.cookies?.[SETUP_COOKIE];
+  if (!token) return null;
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET, { audience: SETUP_AUDIENCE, algorithms: ['HS256'] });
+    const user = await User.findById(payload.uid);
+    // The step is one-time: once a password exists the cookie is useless.
+    if (!user || user.password || user.disabled) return null;
+    return user;
+  } catch (error) {
+    return null;
+  }
+};
+
+const getSetup = async (req, res) => {
+  const user = await setupUser(req);
+  if (!user) return res.status(401).json({ message: 'Sign in with Google or GitHub first.' });
+  return res.json({ username: user.username });
+};
+
+const setupPassword = async (req, res) => {
+  const user = await setupUser(req);
+  if (!user) return res.status(401).json({ message: 'Sign in with Google or GitHub first.' });
+
+  // The password filter makes this a one-time write even if two requests race.
+  const updated = await User.findOneAndUpdate(
+    { _id: user._id, password: { $exists: false } },
+    { $set: { password: await bcrypt.hash(req.body.password, 12) }, $inc: { tokenVersion: 1 } },
+    { returnDocument: 'after' }
+  );
+  res.clearCookie(SETUP_COOKIE, stateCookieOptions());
+  if (!updated) return res.status(409).json({ message: 'Password is already set. Sign in instead.' });
+
+  await audit('USER_PASSWORD_SET', updated, { username: updated.username });
+
+  if (!isActive(updated)) return res.json({ status: 'pending', username: updated.username });
+  setSessionCookie(res, signSessionToken(updated));
+  return res.json({
+    status: 'active',
+    user: { id: updated._id, username: updated.username, role: updated.role }
+  });
 };
 
 const listLinks = async (req, res) => {
@@ -250,7 +303,7 @@ const unlink = async (req, res) => {
   if (!hasOtherMethod) {
     return res
       .status(409)
-      .json({ message: 'This is your only sign-in method. Ask an admin to set a password before unlinking it.' });
+      .json({ message: 'This is your only sign-in method. Set a password before unlinking it.' });
   }
 
   await User.updateOne({ _id: user._id }, { $unset: { [`oauth.${name}`]: '' } });
@@ -258,4 +311,14 @@ const unlink = async (req, res) => {
   return res.json({ message: 'Unlinked.' });
 };
 
-module.exports = { listProviders, start, callback, listLinks, unlink, STATE_COOKIE };
+module.exports = {
+  listProviders,
+  start,
+  callback,
+  getSetup,
+  setupPassword,
+  listLinks,
+  unlink,
+  STATE_COOKIE,
+  SETUP_COOKIE
+};

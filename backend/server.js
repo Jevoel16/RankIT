@@ -7,7 +7,7 @@ const path = require('path');
 const connectDB = require('./config/db');
 const { errorHandler, notFoundHandler } = require('./utils/httpErrors');
 const { rejectOperatorKeys, requireAppHeader } = require('./middleware/validate');
-const { apiLimiter, loginLimiter, registerLimiter } = require('./middleware/rateLimit');
+const { apiLimiter, loginLimiter } = require('./middleware/rateLimit');
 const userRoutes = require('./routes/userRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const scoresRoutes = require('./routes/scoresRoutes');
@@ -18,6 +18,7 @@ const publicRoutes = require('./routes/publicRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const assignmentRoutes = require('./routes/assignmentRoutes');
 const rankingRoutes = require('./routes/rankingRoutes');
+const recoveryRoutes = require('./routes/recoveryRoutes');
 const oauthRoutes = require('./routes/oauthRoutes');
 const { listProviders } = require('./controllers/oauthController');
 
@@ -56,7 +57,6 @@ app.use('/api', requireAppHeader);
 app.use(rejectOperatorKeys);
 app.use('/api', apiLimiter);
 app.use('/api/users/login', loginLimiter);
-app.use('/api/users/register', registerLimiter);
 
 if (process.env.NODE_ENV === 'production') {
     app.use((req, res, next) => {
@@ -93,6 +93,7 @@ app.use('/api/public', publicRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/rankings', rankingRoutes);
+app.use('/api/recovery', recoveryRoutes);
 app.use('/api/auth', oauthRoutes);
 
 app.get('/', (req, res) => {

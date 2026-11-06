@@ -1,40 +1,20 @@
 const express = require('express');
 const router = express.Router();
-const {
-    getUsers,
-    createUser,
-    updateUser,
-    deleteUser
-} = require('../controllers/userController');
-const {
-    registerUser,
-    logoutUser,
-    getCurrentUser,
-    loginUser,
-    getPendingUsers,
-    updateApproval,
-    adminCreateUser
-} = require('../controllers/authController');
+const { getUsers, assignRole, setStatus, resetPassword, deleteUser } = require('../controllers/userController');
+const { logoutUser, getCurrentUser, loginUser } = require('../controllers/authController');
 const { authenticate, authorize } = require('../middleware/authMiddleware');
 const { validateBody } = require('../middleware/validate');
 const schemas = require('../validation/schemas');
 
-router.post('/register', validateBody(schemas.register), registerUser);
+// Accounts are created only by signing in with Google/GitHub (see /api/auth).
 router.post('/login', validateBody(schemas.login), loginUser);
 router.post('/logout', logoutUser);
 router.get('/me', authenticate, getCurrentUser);
-router.get('/pending', authenticate, authorize('admin', 'superadmin'), getPendingUsers);
-router.patch('/:id/approval', authenticate, authorize('admin', 'superadmin'), validateBody(schemas.approval), updateApproval);
-router.post('/admin-create', authenticate, authorize('admin', 'superadmin'), validateBody(schemas.adminCreateUser), adminCreateUser);
 
-router
-    .route('/')
-    .get(authenticate, authorize('superadmin'), getUsers)
-    .post(authenticate, authorize('admin', 'superadmin'), validateBody(schemas.createUser), createUser);
-
-router
-    .route('/:id')
-    .put(authenticate, authorize('admin', 'superadmin'), validateBody(schemas.updateUser), updateUser)
-    .delete(authenticate, authorize('admin', 'superadmin'), deleteUser);
+router.get('/', authenticate, authorize('admin'), getUsers);
+router.patch('/:id/role', authenticate, authorize('admin'), validateBody(schemas.assignRole), assignRole);
+router.patch('/:id/status', authenticate, authorize('admin'), validateBody(schemas.userStatus), setStatus);
+router.put('/:id/password', authenticate, authorize('admin'), validateBody(schemas.resetPassword), resetPassword);
+router.delete('/:id', authenticate, authorize('admin'), deleteUser);
 
 module.exports = router;

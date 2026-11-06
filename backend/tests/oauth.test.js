@@ -56,11 +56,11 @@ describe('oauth providers', () => {
     expect(res.headers['set-cookie'].join(';')).toMatch(/rankit_oauth=.*HttpOnly/);
   });
 
-  it('rejects unknown providers and invalid roles', async () => {
+  it('rejects unknown providers and the removed register mode', async () => {
     const unknown = await request(app).get('/api/auth/facebook/start');
     expect(unknown.headers.location).toBe('/login?oauth_error=disabled');
-    const admin = await request(app).get('/api/auth/google/start').query({ mode: 'register', role: 'admin' });
-    expect(admin.headers.location).toBe('/login?oauth_error=invalid_request');
+    const register = await request(app).get('/api/auth/google/start').query({ mode: 'register' });
+    expect(register.headers.location).toBe('/login?oauth_error=invalid_request');
   });
 
   it('rejects a callback whose state does not match', async () => {
@@ -72,47 +72,96 @@ describe('oauth providers', () => {
 });
 
 describe('oauth sign-up and sign-in', () => {
-  it('registers a pending account and refuses sign-in until approved', async () => {
+  const setupAgent = () => request.agent(app).set(APP_HEADER);
+
+  it('creates a pending account on first sign-in and asks for a password', async () => {
     mockProvider({ sub: 'g-100', email: 'Ana.Cruz@example.com', email_verified: true });
-    const res = await runFlow(request.agent(app), 'google', { mode: 'register', role: 'grievance' });
-    expect(res.headers.location).toBe('/login?oauth=pending&username=ana.cruz%40grievance.rankit');
+    const agent = setupAgent();
+    const res = await runFlow(agent, 'google', {});
+    expect(res.headers.location).toBe('/setup-password');
+    expect(res.headers['set-cookie'].join(';')).toMatch(/rankit_setup=.*HttpOnly/);
+    expect(res.headers['set-cookie'].join(';')).not.toMatch(/rankit_session=/);
 
     const user = await User.findOne({ 'oauth.google.providerId': 'g-100' });
-    expect(user.approvalStatus).toBe('pending');
+    expect(user).toMatchObject({ username: 'ana.cruz', role: 'pending' });
     expect(user.password).toBeUndefined();
 
-    const again = await runFlow(request.agent(app), 'google', { mode: 'login' });
-    expect(again.headers.location).toBe('/login?oauth_error=pending');
+    const setup = await agent.get('/api/auth/setup');
+    expect(setup.body.username).toBe('ana.cruz');
+
+    const mismatch = await agent
+      .post('/api/auth/setup-password')
+      .send({ password: 'long-enough-1', confirmPassword: 'other' });
+    expect(mismatch.status).toBe(400);
+
+    const done = await agent
+      .post('/api/auth/setup-password')
+      .send({ password: 'long-enough-1', confirmPassword: 'long-enough-1' });
+    expect(done.body).toMatchObject({ status: 'pending', username: 'ana.cruz' });
+    expect((await agent.get('/api/users/me')).status).toBe(401);
+
+    // The setup step is one-time.
+    const again = await agent
+      .post('/api/auth/setup-password')
+      .send({ password: 'hijack-pass-1', confirmPassword: 'hijack-pass-1' });
+    expect(again.status).toBe(401);
   });
 
-  it('signs in an approved linked account with a session cookie', async () => {
-    await User.updateOne({ 'oauth.google.providerId': 'g-100' }, { isApproved: true, approvalStatus: 'approved' });
-    mockProvider({ sub: 'g-100', email: 'ana.cruz@example.com', email_verified: true });
-    const agent = request.agent(app);
-    const res = await runFlow(agent, 'google', { mode: 'login' });
-    expect(res.headers.location).toBe('/login');
-    const me = await agent.get('/api/users/me');
-    expect(me.body.user.username).toBe('ana.cruz@grievance.rankit');
-  });
-
-  it('does not let an OAuth-only account sign in with a blank password', async () => {
-    const res = await request(app)
-      .post('/api/users/login')
-      .set(APP_HEADER)
-      .send({ username: 'ana.cruz@grievance.rankit', password: 'anything' });
+  it('refuses the setup step without an OAuth sign-in', async () => {
+    const res = await setupAgent()
+      .post('/api/auth/setup-password')
+      .send({ password: 'long-enough-1', confirmPassword: 'long-enough-1' });
     expect(res.status).toBe(401);
   });
 
-  it('refuses sign-in for an identity that is not linked', async () => {
-    mockProvider({ id: 555, login: 'stranger' });
-    const res = await runFlow(request.agent(app), 'github', { mode: 'login' });
-    expect(res.headers.location).toBe('/login?oauth_error=not_linked');
+  it('keeps pending accounts out until an admin assigns a role', async () => {
+    mockProvider({ sub: 'g-100', email: 'ana.cruz@example.com', email_verified: true });
+    const res = await runFlow(setupAgent(), 'google', {});
+    expect(res.headers.location).toBe('/login?oauth=pending&username=ana.cruz');
+
+    const password = await request(app)
+      .post('/api/users/login')
+      .set(APP_HEADER)
+      .send({ username: 'ana.cruz', password: 'long-enough-1' });
+    expect(password.status).toBe(403);
+  });
+
+  it('signs in with OAuth or password once a role is assigned', async () => {
+    await User.updateOne({ username: 'ana.cruz' }, { role: 'grievance' });
+    mockProvider({ sub: 'g-100', email: 'ana.cruz@example.com', email_verified: true });
+    const agent = setupAgent();
+    const res = await runFlow(agent, 'google', {});
+    expect(res.headers.location).toBe('/login');
+    expect((await agent.get('/api/users/me')).body.user).toMatchObject({ username: 'ana.cruz', role: 'grievance' });
+
+    const password = await request(app)
+      .post('/api/users/login')
+      .set(APP_HEADER)
+      .send({ username: 'ana.cruz', password: 'long-enough-1' });
+    expect(password.status).toBe(200);
+  });
+
+  it('uses the GitHub login as username and adds a number on clashes', async () => {
+    await createUser('octo', 'tabulator');
+    mockProvider({ id: 555, login: 'Octo' });
+    const res = await runFlow(setupAgent(), 'github', {});
+    expect(res.headers.location).toBe('/setup-password');
+    const user = await User.findOne({ 'oauth.github.providerId': '555' });
+    expect(user.username).toBe('octo2');
+  });
+
+  it('blocks disabled accounts', async () => {
+    await User.updateOne({ 'oauth.github.providerId': '555' }, { disabled: true });
+    mockProvider({ id: 555, login: 'Octo' });
+    const res = await runFlow(setupAgent(), 'github', {});
+    expect(res.headers.location).toBe('/login?oauth_error=disabled');
   });
 
   it('refuses Google accounts without a verified email', async () => {
     mockProvider({ sub: 'g-200', email: 'x@example.com', email_verified: false });
-    const res = await runFlow(request.agent(app), 'google', { mode: 'register' });
+    const res = await runFlow(setupAgent(), 'google', {});
     expect(res.headers.location).toBe('/login?oauth_error=unverified_email');
+    expect(await User.exists({ 'oauth.google.providerId': 'g-200' })).toBeNull();
   });
 });
 
@@ -133,7 +182,7 @@ describe('linking accounts', () => {
     expect(links.body.providers.find((p) => p.id === 'github')).toMatchObject({ linked: true, account: 'linker-gh' });
 
     mockProvider({ id: 42, login: 'linker-gh' });
-    const signIn = await runFlow(request.agent(app), 'github', { mode: 'login' });
+    const signIn = await runFlow(request.agent(app), 'github', {});
     expect(signIn.headers.location).toBe('/login');
   });
 
@@ -145,17 +194,13 @@ describe('linking accounts', () => {
     expect(res.headers.location).toBe('/?oauth_error=linked_elsewhere');
   });
 
-  it('unlinks only while another sign-in method remains', async () => {
+  // Active accounts always have a password, so an OAuth link can be removed.
+  it('unlinks a provider', async () => {
     const admin = await User.findOne({ 'oauth.github.providerId': '42' });
     const agent = await loginAs(app, admin);
     const unlinked = await agent.delete('/api/auth/github/link');
     expect(unlinked.status).toBe(200);
-
-    // The OAuth-only account cannot drop its only method.
-    mockProvider({ sub: 'g-100', email: 'ana.cruz@example.com', email_verified: true });
-    const anaAgent = request.agent(app).set(APP_HEADER);
-    await runFlow(anaAgent, 'google', { mode: 'login' });
-    const refused = await anaAgent.delete('/api/auth/google/link');
-    expect(refused.status).toBe(409);
+    const again = await agent.delete('/api/auth/github/link');
+    expect(again.status).toBe(404);
   });
 });

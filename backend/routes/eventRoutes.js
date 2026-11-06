@@ -20,11 +20,11 @@ router
 
 router
     .route('/:id')
-    .get(authenticate, authorize('admin', 'tabulator', 'grievance'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'superadmin', 'grievance'] }), getEvent)
+    .get(authenticate, authorize('admin', 'tabulator', 'grievance'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'grievance'] }), getEvent)
     .put(authenticate, authorize('admin'), validateBody(schemas.updateEvent), updateEvent)
     .delete(authenticate, authorize('admin'), deleteEvent);
 
-router.get('/:id/unlock-status', authenticate, authorize('admin', 'tabulator', 'grievance'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'superadmin', 'grievance'] }), getEventUnlockStatus);
+router.get('/:id/unlock-status', authenticate, authorize('admin', 'tabulator', 'grievance'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'grievance'] }), getEventUnlockStatus);
 
 router.patch('/:eventId/status', authenticate, authorize('admin'), validateBody(schemas.eventStatus), patchEventStatus);
 

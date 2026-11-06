@@ -9,6 +9,7 @@ import ProtectedRouter from './components/ProtectedRouter.jsx';
 import { useAuth } from './hooks/useAuth';
 import { homePathForRole } from './utils/roles';
 import LoginPage from './pages/LoginPage.jsx';
+import SetupPasswordPage from './pages/SetupPasswordPage.jsx';
 import TabulatorPage from './pages/tabulator/TabulatorPage.jsx';
 import AdminPage from './pages/admin/AdminPage.jsx';
 import SuperadminPage from './pages/superadmin/SuperadminPage.jsx';
@@ -32,6 +33,7 @@ function App() {
       >
         <Route path="/" element={<CommunityHome />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/setup-password" element={<SetupPasswordPage />} />
         <Route
           path="/tabulator"
           element={
@@ -61,7 +63,7 @@ function App() {
         <Route
           path="/admin"
           element={
-            <ProtectedRouter roles={['admin', 'superadmin']}>
+            <ProtectedRouter roles={['admin']}>
               <AdminPage />
             </ProtectedRouter>
           }

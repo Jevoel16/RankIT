@@ -17,7 +17,8 @@ async function request(path, options = {}) {
   });
 
   // An expired or revoked session anywhere in the app sends the user back to sign in.
-  if (response.status === 401 && !path.startsWith('/users/login') && !path.startsWith('/users/me')) {
+  const quiet401 = ['/users/login', '/users/me', '/auth/setup'].some((prefix) => path.startsWith(prefix));
+  if (response.status === 401 && !quiet401) {
     window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
   }
 
@@ -63,36 +64,48 @@ export function login(username, password) {
   });
 }
 
-export function register(body) {
-  return request('/users/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+const jsonBody = (method, body) => ({
+  method,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body)
+});
+
+// Accounts are created only through Google/GitHub; this finishes the first sign-in.
+export function fetchPasswordSetup() {
+  return request('/auth/setup');
 }
 
-export function fetchPendingUsers() {
-  return request('/users/pending');
+export function submitPasswordSetup(password, confirmPassword) {
+  return request('/auth/setup-password', jsonBody('POST', { password, confirmPassword }));
 }
 
-export function updateUserApproval(userId, decision) {
-  return request(`/users/${userId}/approval`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ decision })
-  });
+export function assignUserRole(userId, role) {
+  return request(`/users/${encodeURIComponent(userId)}/role`, jsonBody('PATCH', { role }));
 }
 
-export function adminCreateUser(body) {
-  return request('/users/admin-create', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
+export function setUserDisabled(userId, disabled) {
+  return request(`/users/${encodeURIComponent(userId)}/status`, jsonBody('PATCH', { disabled }));
+}
+
+export function resetUserPassword(userId, password) {
+  return request(`/users/${encodeURIComponent(userId)}/password`, jsonBody('PUT', { password }));
+}
+
+export function deleteUser(userId) {
+  return request(`/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
+// Superadmin recovery: promote to admin and reset admin passwords only.
+export function fetchRecoveryAccounts() {
+  return request('/recovery/accounts');
+}
+
+export function promoteToAdmin(userId) {
+  return request(`/recovery/${encodeURIComponent(userId)}/promote`, { method: 'PATCH' });
+}
+
+export function resetAdminPassword(userId, password) {
+  return request(`/recovery/${encodeURIComponent(userId)}/password`, jsonBody('PUT', { password }));
 }
 
 export function fetchUsers() {

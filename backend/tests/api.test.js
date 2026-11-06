@@ -13,7 +13,7 @@ beforeAll(async () => {
     admin: await createUser('mark', 'admin'),
     tabulator: await createUser('al', 'tabulator'),
     grievance: await createUser('kibra', 'grievance'),
-    pending: await createUser('phil', 'tabulator', { approved: false })
+    pending: await createUser('phil', 'pending')
   };
 }, 120000);
 
@@ -49,7 +49,7 @@ describe('health and errors', () => {
 });
 
 describe('auth', () => {
-  it('logs in an approved user', async () => {
+  it('logs in a user with a role', async () => {
     const res = await request(app)
       .post('/api/users/login')
       .set(APP_HEADER)
@@ -74,16 +74,22 @@ describe('auth', () => {
     expect(res.status).toBe(400);
   });
 
-  it('validates registration input', async () => {
-    const short = await request(app).post('/api/users/register').set(APP_HEADER).send({ username: 'newbie', password: '123' });
-    expect(short.status).toBe(400);
-    expect(short.body.message).toMatch(/password/);
+  it('blocks disabled accounts', async () => {
+    const off = await createUser('off', 'tabulator', { disabled: true });
+    const res = await request(app).post('/api/users/login').set(APP_HEADER).send({ username: off.username, password: PASSWORD });
+    expect(res.status).toBe(403);
+  });
 
-    const admin = await request(app)
+  it('has no password registration or direct account creation', async () => {
+    const register = await request(app)
       .post('/api/users/register')
       .set(APP_HEADER)
-      .send({ username: 'sneaky', password: 'long-enough-pw', role: 'admin' });
-    expect(admin.status).toBe(400);
+      .send({ username: 'newbie', password: 'long-enough-pw' });
+    expect(register.status).toBe(404);
+
+    const admin = await loginAs(app, users.admin);
+    const create = await admin.post('/api/users').send({ username: 'x', password: 'long-enough-pw', role: 'tabulator' });
+    expect(create.status).toBe(404);
   });
 });
 
@@ -124,47 +130,73 @@ describe('session cookie', () => {
     const session = await loginAs(app, victim);
     expect((await session.get('/api/users/me')).status).toBe(200);
 
-    const root = await loginAs(app, users.superadmin);
-    const update = await root.put(`/api/users/${victim._id}`).send({ password: 'brand-new-pass' });
+    const admin = await loginAs(app, users.admin);
+    const update = await admin.put(`/api/users/${victim._id}/password`).send({ password: 'brand-new-pass' });
+    expect(update.status).toBe(200);
+    expect((await session.get('/api/users/me')).status).toBe(401);
+  });
+
+  it('revokes sessions after a role change', async () => {
+    const victim = await createUser('ellis', 'tabulator');
+    const session = await loginAs(app, victim);
+    const admin = await loginAs(app, users.admin);
+    const update = await admin.patch(`/api/users/${victim._id}/role`).send({ role: 'grievance' });
     expect(update.status).toBe(200);
     expect((await session.get('/api/users/me')).status).toBe(401);
   });
 });
 
-describe('account hierarchy', () => {
-  it('stops admins from changing or deleting a superadmin', async () => {
+describe('admin user management', () => {
+  it('lists users without hashes or the superadmin', async () => {
     const admin = await loginAs(app, users.admin);
-    const reset = await admin.put(`/api/users/${users.superadmin._id}`).send({ password: 'hijacked-password' });
-    expect(reset.status).toBe(403);
-    const remove = await admin.delete(`/api/users/${users.superadmin._id}`);
-    expect(remove.status).toBe(403);
-  });
-
-  it('stops admins from granting the admin role', async () => {
-    const admin = await loginAs(app, users.admin);
-    const target = await createUser('promo', 'tabulator');
-    const promote = await admin.put(`/api/users/${target._id}`).send({ role: 'admin' });
-    expect(promote.status).toBe(403);
-    const create = await admin.post('/api/users').send({ username: 'newadmin', password: 'long-enough-pw', role: 'admin' });
-    expect(create.status).toBe(403);
-  });
-
-  it('lets admins manage tabulators and keeps the username format', async () => {
-    const admin = await loginAs(app, users.admin);
-    const target = await createUser('rename', 'tabulator');
-    const res = await admin.put(`/api/users/${target._id}`).send({ username: 'x@superadmin.rankit' });
+    const res = await admin.get('/api/users');
     expect(res.status).toBe(200);
-    expect(res.body.username).toBe('x@tabulator.rankit');
+    expect(res.body.some((user) => user.role === 'superadmin')).toBe(false);
+    expect(res.body.every((user) => !('password' in user))).toBe(true);
+    expect(res.body.find((user) => user.username === 'phil')).toMatchObject({ role: 'pending', hasPassword: true });
   });
 
-  it('lets superadmin promote users but not delete itself', async () => {
-    const root = await loginAs(app, users.superadmin);
-    const target = await createUser('rising', 'tabulator');
-    const promote = await root.put(`/api/users/${target._id}`).send({ role: 'admin' });
-    expect(promote.status).toBe(200);
-    expect(promote.body.role).toBe('admin');
-    const self = await root.delete(`/api/users/${users.superadmin._id}`);
-    expect(self.status).toBe(400);
+  it('assigns a role to a new sign-up, including admin', async () => {
+    const admin = await loginAs(app, users.admin);
+    const fresh = await createUser('newbie', 'pending');
+    const res = await admin.patch(`/api/users/${fresh._id}/role`).send({ role: 'tabulator' });
+    expect(res.status).toBe(200);
+    expect(res.body.role).toBe('tabulator');
+    await loginAs(app, fresh);
+
+    const promoted = await createUser('rising', 'tabulator');
+    const toAdmin = await admin.patch(`/api/users/${promoted._id}/role`).send({ role: 'admin' });
+    expect(toAdmin.body.role).toBe('admin');
+
+    const superRole = await admin.patch(`/api/users/${fresh._id}/role`).send({ role: 'superadmin' });
+    expect(superRole.status).toBe(400);
+  });
+
+  it('rejects a sign-up by disabling it, and can enable it again', async () => {
+    const admin = await loginAs(app, users.admin);
+    const target = await createUser('nope', 'pending');
+    const off = await admin.patch(`/api/users/${target._id}/status`).send({ disabled: true });
+    expect(off.body.disabled).toBe(true);
+    const on = await admin.patch(`/api/users/${target._id}/status`).send({ disabled: false });
+    expect(on.body.disabled).toBe(false);
+  });
+
+  it('stops admins from touching admins, the superadmin or themselves', async () => {
+    const admin = await loginAs(app, users.admin);
+    const other = await createUser('peer', 'admin');
+    for (const target of [other, users.superadmin, users.admin]) {
+      const reset = await admin.put(`/api/users/${target._id}/password`).send({ password: 'hijacked-password' });
+      expect([400, 403]).toContain(reset.status);
+      const demote = await admin.patch(`/api/users/${target._id}/role`).send({ role: 'tabulator' });
+      expect([400, 403]).toContain(demote.status);
+      const remove = await admin.delete(`/api/users/${target._id}`);
+      expect([400, 403]).toContain(remove.status);
+    }
+  });
+
+  it('forbids non-admins from managing users', async () => {
+    const tab = await loginAs(app, users.tabulator);
+    expect((await tab.get('/api/users')).status).toBe(403);
   });
 
   it('rejects repeated eventId query parameters', async () => {
@@ -175,6 +207,44 @@ describe('account hierarchy', () => {
   });
 });
 
+describe('superadmin recovery', () => {
+  it('is limited to recovery routes', async () => {
+    const root = await loginAs(app, users.superadmin);
+    for (const path of ['/api/events', '/api/users', '/api/audits', '/api/analytics/overview', '/api/admin/backup']) {
+      expect((await root.get(path)).status).toBe(403);
+    }
+    expect((await root.get('/api/recovery/accounts')).status).toBe(200);
+  });
+
+  it('promotes a user to admin', async () => {
+    const root = await loginAs(app, users.superadmin);
+    const target = await createUser('heir', 'tabulator');
+    const res = await root.patch(`/api/recovery/${target._id}/promote`);
+    expect(res.status).toBe(200);
+    expect(res.body.role).toBe('admin');
+  });
+
+  it('resets an admin password but nobody else', async () => {
+    const root = await loginAs(app, users.superadmin);
+    const locked = await createUser('locked', 'admin');
+    const res = await root.put(`/api/recovery/${locked._id}/password`).send({ password: 'recovered-pass-1' });
+    expect(res.status).toBe(200);
+    const login = await request(app)
+      .post('/api/users/login')
+      .set(APP_HEADER)
+      .send({ username: 'locked', password: 'recovered-pass-1' });
+    expect(login.status).toBe(200);
+
+    const tab = await root.put(`/api/recovery/${users.tabulator._id}/password`).send({ password: 'recovered-pass-1' });
+    expect(tab.status).toBe(403);
+  });
+
+  it('is closed to admins', async () => {
+    const admin = await loginAs(app, users.admin);
+    expect((await admin.get('/api/recovery/accounts')).status).toBe(403);
+  });
+});
+
 describe('role guards', () => {
   it('forbids tabulators from the audit trail', async () => {
     const agent = await loginAs(app, users.tabulator);
@@ -182,20 +252,10 @@ describe('role guards', () => {
     expect(res.status).toBe(403);
   });
 
-  it('lets superadmin use admin routes', async () => {
-    const agent = await loginAs(app, users.superadmin);
-    const res = await agent.get('/api/events');
-    expect(res.status).toBe(200);
-  });
-
-  it('lets superadmin see and approve pending accounts of any role', async () => {
-    const waiting = await createUser('newgriev', 'grievance', { approved: false });
-    const root = await loginAs(app, users.superadmin);
-    const pending = await root.get('/api/users/pending');
-    expect(pending.body.map((user) => user.username)).toContain(waiting.username);
-    const res = await root.patch(`/api/users/${waiting._id}/approval`).send({ decision: 'approve' });
-    expect(res.status).toBe(200);
-    expect(res.body.approvalStatus).toBe('approved');
+  it('gives admins the audit trail and analytics', async () => {
+    const agent = await loginAs(app, users.admin);
+    expect((await agent.get('/api/audits')).status).toBe(200);
+    expect((await agent.get('/api/analytics/overview')).status).toBe(200);
   });
 
   it('requires authentication', async () => {

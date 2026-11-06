@@ -8,7 +8,7 @@ import FullResultsPDF from './FullResultsPDF';
 import WeightedRankingsPDF from './WeightedRankingsPDF';
 import { Modal, TabPanel, Tabs } from './ui';
 
-const ADMIN_ROLES = ['admin', 'superadmin'];
+const ADMIN_ROLES = ['admin'];
 const slug = (value) => String(value || 'event').replace(/\s+/g, '_');
 
 // Which report tabs a role may see, in display order.

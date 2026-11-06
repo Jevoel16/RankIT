@@ -25,8 +25,7 @@ const getApprovedUsersByRole = async (req, res) => {
 
   const users = await User.find({
     role,
-    isApproved: true,
-    approvalStatus: 'approved'
+    disabled: { $ne: true }
   })
     .select('_id username role')
     .sort({ username: 1 });
@@ -45,7 +44,7 @@ const assignTabulatorToEvent = async (req, res) => {
 
     const [event, tabulator] = await Promise.all([
       Event.findById(eventId),
-      User.findOne({ _id: tabulatorId, role: 'tabulator', isApproved: true, approvalStatus: 'approved' })
+      User.findOne({ _id: tabulatorId, role: 'tabulator', disabled: { $ne: true } })
     ]);
 
     if (!event) {
@@ -100,8 +99,7 @@ const assignTalliersToEvent = async (req, res) => {
       const validTallierCount = await User.countDocuments({
         _id: { $in: tallierIds },
         role: 'tallier',
-        isApproved: true,
-        approvalStatus: 'approved'
+        disabled: { $ne: true }
       });
 
       if (validTallierCount !== tallierIds.length) {

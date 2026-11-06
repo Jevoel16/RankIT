@@ -90,8 +90,7 @@ async function seedEvents() {
 
   const approvedTabulators = await User.find({
     role: 'tabulator',
-    isApproved: true,
-    approvalStatus: 'approved'
+    disabled: { $ne: true }
   })
     .select('_id username')
     .lean();

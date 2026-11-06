@@ -58,16 +58,18 @@ Older versions used two projects (`rankit-api` rooted at `backend`, `rankit` roo
 the `rankit` project's **Root Directory** back to the repository root, copy the API project's environment
 variables into it, redeploy, then delete the `rankit-api` project.
 
-## 3. Google and GitHub sign-in (optional)
+## 3. Google and GitHub sign-in
 
-Staff can sign in with Google or GitHub instead of a password. New OAuth sign-ups still wait for admin approval
-(tabulator and grievance only); admins and superadmins link Google/GitHub to their existing account under
+Accounts are created **only** by signing in with Google or GitHub, so set up at least one provider. The first
+sign-in creates the account (username = GitHub login or the part of the Google email before `@`, with a number added
+if taken) and asks for a password, so the person can also sign in with username + password. The account then waits
+until an admin assigns a role (tabulator, grievance or admin). More providers can be linked under
 **Connected accounts** (link icon in the header, or the menu on phones). A provider's button appears only when both
 of its variables are set.
 
 The redirect URIs are `<APP_URL>/api/auth/google/callback` and `<APP_URL>/api/auth/github/callback`. `APP_URL`
 defaults to the production domain on Vercel, so OAuth works on production; preview URLs change per deployment, so
-previews keep password sign-in only.
+previews only allow password sign-in for existing accounts.
 
 **Google** (Google Cloud Console → APIs & Services):
 1. **OAuth consent screen**: app name `RankIT`, user type External, upload
@@ -94,18 +96,38 @@ previews keep password sign-in only.
 The other logo exports (GitHub social preview, large icon) and where they go are listed in
 [`docs/brand/README.md`](brand/README.md).
 
-## 4. First superadmin
+## 4. Superadmin and the first admin
 
 Never run `seed:users` / `seed:events` against production: they use a shared demo password and reset data
-(the scripts refuse non-local databases unless forced). Create the first account instead:
+(the scripts refuse non-local databases unless forced). Create the superadmin instead; it is the only account
+not created through Google/GitHub, and its only job is recovering admin access:
 
 ```bash
 cd backend
 MONGODB_URI="<atlas SRV string>" npm run create:superadmin
 ```
 
-It prompts for a username and a password (12+ characters), hashes it, and prints the login name
-(`<name>@superadmin.rankit`). Sign in, then create admins from the Superadmin console.
+It prompts for a username and a password (12+ characters), hashes it, and prints the username. Then:
+
+1. The future admin signs in with Google or GitHub and sets a password.
+2. The superadmin signs in with username + password and clicks **Make admin** on that account in **Admin Recovery**.
+3. From then on admins assign every other role. The superadmin can only promote someone to admin or reset an
+   admin's password (for example when an admin is locked out).
+
+### Upgrading from 2.x
+
+Version 3.0 drops the `name@role.rankit` usernames and the approval fields. After deploying, run once against the
+production database (preview first with `--dry-run`):
+
+```bash
+cd backend
+MONGODB_URI="<atlas SRV string>" npm run migrate:accounts -- --dry-run
+MONGODB_URI="<atlas SRV string>" npm run migrate:accounts
+```
+
+It strips the `@role.rankit` suffix (adding a number on clashes), turns pending accounts into "waiting for a role",
+disables rejected ones, and signs everyone out. Tell staff their new username (the printed list), and re-run
+`create:superadmin` if the superadmin should get a new name.
 
 ## 5. Smoke test before announcing
 

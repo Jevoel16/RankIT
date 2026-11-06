@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchAnalyticsOverview, fetchUsers } from '../../api';
 import { Skeleton, useToast } from '../../components/ui';
-import { ROLE_LABELS } from '../../utils/roles';
+import { ROLE_LABELS, accountStatus } from '../../utils/roles';
 
-const ROLE_ORDER = ['admin', 'tabulator', 'grievance', 'superadmin'];
+const ROLE_ORDER = ['admin', 'tabulator', 'grievance', 'pending'];
 const RADIUS = 66;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-const isApproved = (user) => user.isApproved || user.approvalStatus === 'approved';
-const isPending = (user) => user.approvalStatus === 'pending' || (!user.isApproved && !user.approvalStatus);
 
 function StatTile({ label, value }) {
   return (
@@ -21,8 +19,8 @@ function StatTile({ label, value }) {
 function RoleDonut({ users }) {
   const [filter, setFilter] = useState('total');
   const filtered = useMemo(() => {
-    if (filter === 'approved') return users.filter(isApproved);
-    if (filter === 'pending') return users.filter(isPending);
+    if (filter === 'active') return users.filter((user) => accountStatus(user) === 'active');
+    if (filter === 'disabled') return users.filter((user) => accountStatus(user) === 'disabled');
     return users;
   }, [users, filter]);
 
@@ -40,8 +38,8 @@ function RoleDonut({ users }) {
         <h3>Users by role</h3>
         <select aria-label="Which users to count" value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="total">All users</option>
-          <option value="approved">Approved</option>
-          <option value="pending">Pending</option>
+          <option value="active">Active</option>
+          <option value="disabled">Disabled</option>
         </select>
       </div>
       <div className="donut-layout">
@@ -110,8 +108,8 @@ export default function AnalyticsPanel() {
     <div className="form-stack">
       <div className="stat-grid">
         <StatTile label="Users" value={totals.users} />
-        <StatTile label="Approved" value={totals.approvedUsers} />
-        <StatTile label="Pending" value={totals.pendingUsers} />
+        <StatTile label="Active" value={totals.approvedUsers} />
+        <StatTile label="Waiting for a role" value={totals.pendingUsers} />
         <StatTile label="Events" value={totals.events} />
         <StatTile label="Contestants" value={totals.contestants} />
         <StatTile label="Score sheets" value={totals.tallies} />

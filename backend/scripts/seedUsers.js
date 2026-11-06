@@ -5,18 +5,19 @@ const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const { assertLocalDatabase } = require('./guard');
 
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+dotenv.config({ path: path.join(__dirname, '..', '.env'), quiet: true });
 
+// Local demo accounts. Real accounts are created by signing in with Google/GitHub.
 const usersToSeed = [
-  { username: 'jevoel', role: 'superadmin', isApproved: true, approvalStatus: 'approved' },
-  { username: 'mark', role: 'admin', isApproved: true, approvalStatus: 'approved' },
-  { username: 'al', role: 'tabulator', isApproved: true, approvalStatus: 'approved' },
-  { username: 'kibra', role: 'grievance', isApproved: true, approvalStatus: 'approved' },
-  { username: 'jheo', role: 'tabulator', isApproved: true, approvalStatus: 'approved' },
-  { username: 'quinit', role: 'tabulator', isApproved: true, approvalStatus: 'approved' },
-  { username: 'francis', role: 'tabulator', isApproved: true, approvalStatus: 'approved' },
-  { username: 'phil', role: 'tabulator', isApproved: true, approvalStatus: 'pending' },
-  { username: 'rossmir', role: 'tabulator', isApproved: false, approvalStatus: 'pending' }
+  { username: 'jevoel', role: 'superadmin' },
+  { username: 'mark', role: 'admin' },
+  { username: 'al', role: 'tabulator' },
+  { username: 'kibra', role: 'grievance' },
+  { username: 'jheo', role: 'tabulator' },
+  { username: 'quinit', role: 'tabulator' },
+  { username: 'francis', role: 'tabulator' },
+  { username: 'phil', role: 'pending' },
+  { username: 'rossmir', role: 'pending' }
 ];
 
 async function seedUsers() {
@@ -30,29 +31,15 @@ async function seedUsers() {
   const hashedPassword = await bcrypt.hash(process.env.SEED_PASSWORD || '1234', 12);
 
   for (const user of usersToSeed) {
-    // Format: username@role.rankit
-    const domainUsername = `${user.username.split('@')[0]}@${user.role}.rankit`.toLowerCase();
-    
     await User.updateOne(
-      { username: domainUsername },
-      {
-        $set: {
-          username: domainUsername,
-          password: hashedPassword,
-          role: user.role,
-          isApproved: user.isApproved,
-          approvalStatus: user.approvalStatus
-        }
-      },
+      { username: user.username },
+      { $set: { username: user.username, password: hashedPassword, role: user.role, disabled: false } },
       { upsert: true }
     );
   }
 
-  console.log('✅ Seeded users with domain-based identities (shared demo password, see README):');
-  usersToSeed.forEach((user) => {
-    const domainUsername = `${user.username.split('@')[0]}@${user.role}.rankit`.toLowerCase();
-    console.log(`- ${domainUsername} (${user.role}) status=${user.approvalStatus}`);
-  });
+  console.log('Seeded users (shared demo password, see README):');
+  usersToSeed.forEach((user) => console.log(`- ${user.username} (${user.role})`));
 }
 
 seedUsers()
@@ -61,7 +48,7 @@ seedUsers()
     process.exit(0);
   })
   .catch(async (error) => {
-    console.error('❌ Seed error:', error.message);
+    console.error('Seed error:', error.message);
     await mongoose.disconnect();
     process.exit(1);
   });

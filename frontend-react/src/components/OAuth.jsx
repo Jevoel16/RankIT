@@ -9,13 +9,10 @@ export const OAUTH_ERRORS = {
   invalid_request: 'That sign-in request was not valid. Please try again.',
   provider_error: 'Could not reach the sign-in provider. Please try again.',
   unverified_email: 'Your Google email address is not verified yet.',
-  not_linked:
-    'No RankIT account is linked to that account yet. Register with it, or sign in with your password and link it under Connected accounts.',
-  pending: 'Pending Admin Approval.',
-  rejected: 'Account rejected by admin.',
+  pending: 'Waiting for an admin to assign your role.',
   linked_elsewhere: 'That account is already linked to another RankIT user.',
   session_required: 'Sign in first, then link the account.',
-  disabled: 'That sign-in option is not available.'
+  disabled: 'This account is disabled, or that sign-in option is not available. Contact an admin.'
 };
 
 export const oauthErrorMessage = (code) => OAUTH_ERRORS[code] || 'Sign-in failed. Please try again.';
@@ -56,24 +53,21 @@ export function useOAuthProviders() {
   return providers;
 }
 
-export function OAuthButtons({ mode, role }) {
+// The first sign-in with a provider creates the RankIT account.
+export function OAuthButtons() {
   const providers = useOAuthProviders();
   if (providers.length === 0) return null;
 
-  const verb = mode === 'register' ? 'Register with' : 'Continue with';
   return (
     <div className="oauth">
-      <p className="oauth__divider">
-        <span>or</span>
-      </p>
       {providers.map((provider) => (
         <a
           key={provider.id}
           className="ui-btn ui-btn--secondary ui-btn--md ui-btn--block oauth__btn"
-          href={oauthStartUrl(provider.id, mode === 'register' ? { mode, role } : { mode })}
+          href={oauthStartUrl(provider.id)}
         >
           <ProviderIcon provider={provider.id} />
-          {verb} {provider.label}
+          Continue with {provider.label}
         </a>
       ))}
     </div>
@@ -119,7 +113,7 @@ export function ConnectedAccountsModal({ open, onClose, notice }) {
       open={open}
       onClose={onClose}
       title="Connected accounts"
-      description="Sign in to RankIT with Google or GitHub instead of your password."
+      description="Sign in to RankIT with Google or GitHub as well as your password."
       size="sm"
     >
       <div className="form-stack">
