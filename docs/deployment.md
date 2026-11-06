@@ -58,6 +58,42 @@ Older versions used two projects (`rankit-api` rooted at `backend`, `rankit` roo
 the `rankit` project's **Root Directory** back to the repository root, copy the API project's environment
 variables into it, redeploy, then delete the `rankit-api` project.
 
+## 3. Google and GitHub sign-in (optional)
+
+Staff can sign in with Google or GitHub instead of a password. New OAuth sign-ups still wait for admin approval
+(tabulator and grievance only); admins and superadmins link Google/GitHub to their existing account under
+**Connected accounts** (link icon in the header, or the menu on phones). A provider's button appears only when both
+of its variables are set.
+
+The redirect URIs are `<APP_URL>/api/auth/google/callback` and `<APP_URL>/api/auth/github/callback`. `APP_URL`
+defaults to the production domain on Vercel, so OAuth works on production; preview URLs change per deployment, so
+previews keep password sign-in only.
+
+**Google** (Google Cloud Console → APIs & Services):
+1. **OAuth consent screen**: app name `RankIT`, user type External, upload
+   [`docs/brand/oauth-google-120.png`](brand/oauth-google-120.png) as the app logo, scopes `openid`, `email`,
+   `profile`. Publish the app (or add test users while it is in testing).
+2. **Credentials → Create credentials → OAuth client ID**: Web application. Authorized redirect URI:
+   `https://<your-domain>/api/auth/google/callback` (add `http://localhost:3000/api/auth/google/callback` for local
+   testing).
+3. Put the client ID and secret in `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+
+**GitHub** (GitHub → Settings → Developer settings → OAuth Apps → New OAuth App):
+1. Name `RankIT`, homepage `https://<your-domain>`, callback URL `https://<your-domain>/api/auth/github/callback`.
+   GitHub allows one callback URL per app, so create a second app for local testing.
+2. On the app page, upload [`docs/brand/oauth-github-512.png`](brand/oauth-github-512.png) as the logo and set the
+   badge background to `#0b1017`.
+3. Generate a client secret and put the values in `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`.
+
+| Name | Environments | Value |
+|---|---|---|
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Production | From the Google OAuth client |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | Production | From the GitHub OAuth App |
+| `APP_URL` | optional | Only if the public URL isn't the Vercel production domain (e.g. a custom domain) |
+
+The other logo exports (GitHub social preview, large icon) and where they go are listed in
+[`docs/brand/README.md`](brand/README.md).
+
 ## 4. First superadmin
 
 Never run `seed:users` / `seed:events` against production: they use a shared demo password and reset data
@@ -80,6 +116,8 @@ On a preview URL first, then production:
   `Secure`, `SameSite=Lax`, and Local Storage has no token.
 - Record a score as a tabulator, file a deduction as grievance, and download a Master Report PDF as admin.
 - Six wrong passwords in a row return "Too many login attempts".
+- If OAuth is set up: "Continue with Google/GitHub" on a linked account lands on the role's console, and an
+  unlinked one shows "No RankIT account is linked".
 
 ## Rollback
 

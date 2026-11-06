@@ -776,6 +776,7 @@ h3 {
 @media (max-width: 1023px) {
   .shell-nav--desktop,
   .shell-logout,
+  .shell-accounts-btn,
   .shell-actions > .shell-user {
     display: none;
   }

@@ -3,7 +3,7 @@
   <h1>RankIT</h1>
   <p>Live, role-based tabulation and rankings for school events.</p>
 
-[![Version](https://img.shields.io/badge/version-2.6.0-blue?style=flat)](backend/package.json)
+[![Version](https://img.shields.io/badge/version-2.7.0-blue?style=flat)](backend/package.json)
 [![License](https://img.shields.io/badge/license-Sprucetrap%20Source--Available-lightgrey?style=flat)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jevoel16/RankIT/ci.yml?branch=V2.0-RankIT&label=CI&style=flat)](https://github.com/Jevoel16/RankIT/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-web-informational?style=flat)](#getting-started)
@@ -60,6 +60,7 @@ RankIT runs the scoring side of school competitions: admins set up events and cr
 - Big-screen display mode for projectors, with auto-rotating views and a QR code
 - Role consoles for superadmin, admin, tabulator and grievance staff, built for phones and tablets
 - Criteria-based and set-based (sports) scoring with automatic rankings
+- Staff sign-in with a password, Google or GitHub; new accounts wait for admin approval
 - Auditable grievance deductions with reasons
 - Master report PDFs: main results, deduction notes, weighted rankings
 - Audit trail and analytics for superadmins
@@ -113,6 +114,9 @@ The API reads `backend/.env`; see [`backend/.env.example`](backend/.env.example)
 | `MONGODB_URI` | backend | MongoDB connection string |
 | `JWT_SECRET` | backend | Signs session cookies; use a long random value |
 | `JWT_EXPIRES_IN` | backend | Session length, e.g. `12h` |
+| `APP_URL` | backend | Public URL used for OAuth redirect URIs (defaults to the Vercel production domain) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | backend | Enables "Continue with Google" (optional) |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | backend | Enables "Continue with GitHub" (optional) |
 | `CORS_ORIGIN` | backend | Extra allowed browser origins (optional: the app and API share one origin) |
 | `PORT`, `HOST` | backend | Local server bind (default `5000`, `0.0.0.0`) |
 | `SEED_PASSWORD` | backend | Demo password for the local seeders |
@@ -132,6 +136,8 @@ The API reads `backend/.env`; see [`backend/.env.example`](backend/.env.example)
 3. **Grievance** files deductions with a reason when a rule is broken.
 4. **Everyone** follows the public page at `/`; admins choose which events and ranking views are visible. Put `/display` (or `/display/<eventId>`) on a projector: it rotates event, category and overall standings every 15 seconds (`?seconds=20`, `?rotate=0` to pin). Press F for full screen, Space to pause.
 5. **Admin** prints the master report when the event is finalized.
+
+Google/GitHub sign-in is optional; setup steps and the logos to upload are in [docs/deployment.md](docs/deployment.md#3-google-and-github-sign-in-optional).
 
 Deploying: import the repo into Vercel as one project (root directory = repo root); see [docs/deployment.md](docs/deployment.md).
 

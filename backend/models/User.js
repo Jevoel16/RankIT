@@ -8,7 +8,17 @@ const userSchema = new mongoose.Schema({
     trim: true,
     lowercase: true
   },
-  password: { type: String, required: true }, // Hashed
+  // Hashed. Optional only for accounts that sign in with a linked Google/GitHub identity.
+  password: {
+    type: String,
+    required() {
+      return !(this.oauth?.google?.providerId || this.oauth?.github?.providerId);
+    }
+  },
+  oauth: {
+    google: { providerId: String, email: String },
+    github: { providerId: String, login: String }
+  },
   role: {
     type: String,
     enum: ['tabulator', 'grievance', 'admin', 'superadmin'],
@@ -42,5 +52,11 @@ userSchema.pre('save', function(next) {
     next();
   }
 });
+
+// One RankIT account per external identity.
+for (const provider of ['google', 'github']) {
+  const path = `oauth.${provider}.providerId`;
+  userSchema.index({ [path]: 1 }, { unique: true, partialFilterExpression: { [path]: { $type: 'string' } } });
+}
 
 module.exports = mongoose.model('User', userSchema);

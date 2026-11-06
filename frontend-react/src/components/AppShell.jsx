@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { ROLE_LABELS, navLinksForRole, normalizeRole } from '../utils/roles';
+import { ConnectedAccountsModal, oauthErrorMessage } from './OAuth';
 import ThemeSwitcher from './ThemeSwitcher';
 
 const isActive = (link, pathname) => {
@@ -14,8 +15,35 @@ const isActive = (link, pathname) => {
 // the theme switcher, and the footer credit required by the license.
 export default function AppShell({ children, bare = false }) {
   const { isAuthenticated, user, logout } = useAuth();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountsOpen, setAccountsOpen] = useState(false);
+  const [accountsNotice, setAccountsNotice] = useState(null);
+
+  // Linking redirects back to "/?oauth=linked" (or ?oauth_error=...): show the result in the dialog
+  // and drop the query so a reload doesn't repeat it.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const params = new URLSearchParams(search);
+    const linked = params.get('oauth') === 'linked';
+    const errorCode = params.get('oauth_error');
+    if (!linked && !errorCode) return;
+    setAccountsNotice(
+      linked ? { tone: 'success', text: 'Account linked.' } : { tone: 'error', text: oauthErrorMessage(errorCode) }
+    );
+    setAccountsOpen(true);
+    params.delete('oauth');
+    params.delete('oauth_error');
+    const rest = params.toString();
+    navigate({ pathname, search: rest ? `?${rest}` : '' }, { replace: true });
+  }, [isAuthenticated, search, pathname, navigate]);
+
+  const openAccounts = () => {
+    setAccountsNotice(null);
+    setMenuOpen(false);
+    setAccountsOpen(true);
+  };
 
   useEffect(() => {
     setMenuOpen(false);
@@ -73,6 +101,17 @@ export default function AppShell({ children, bare = false }) {
                   <span className="shell-user__name">{user?.username}</span>
                   <span className={`role-badge role-badge--${role}`}>{ROLE_LABELS[role] || role}</span>
                 </span>
+                <button
+                  type="button"
+                  className="ui-icon-btn shell-accounts-btn"
+                  aria-label="Connected accounts"
+                  title="Connected accounts"
+                  onClick={openAccounts}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M10.6 13.4a1 1 0 0 1 0-1.4l3.5-3.5a3 3 0 1 1 4.2 4.2l-2 2-1.4-1.4 2-2a1 1 0 1 0-1.4-1.4L12 13.4a1 1 0 0 1-1.4 0Zm2.8-2.8a1 1 0 0 1 0 1.4l-3.5 3.5a3 3 0 1 1-4.2-4.2l2-2 1.4 1.4-2 2a1 1 0 1 0 1.4 1.4L12 10.6a1 1 0 0 1 1.4 0Z" />
+                  </svg>
+                </button>
                 <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm shell-logout" onClick={logout}>
                   Sign out
                 </button>
@@ -118,11 +157,18 @@ export default function AppShell({ children, bare = false }) {
             <nav className="shell-nav shell-nav--drawer" aria-label="Main">
               {navItems}
             </nav>
+            <button type="button" className="ui-btn ui-btn--ghost ui-btn--block" onClick={openAccounts}>
+              Connected accounts
+            </button>
             <button type="button" className="ui-btn ui-btn--secondary ui-btn--block" onClick={logout}>
               Sign out
             </button>
           </aside>
         </div>
+      )}
+
+      {isAuthenticated && (
+        <ConnectedAccountsModal open={accountsOpen} onClose={() => setAccountsOpen(false)} notice={accountsNotice} />
       )}
 
       <main id="main-content" className="content-shell" tabIndex={-1}>

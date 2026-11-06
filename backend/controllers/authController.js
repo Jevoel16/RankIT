@@ -90,7 +90,8 @@ const loginUser = async (req, res) => {
   // For now, accept full domain format
   let user = await User.findOne({ username: searchUsername });
   
-  if (!user) {
+  // OAuth-only accounts have no password to compare against.
+  if (!user || !user.password) {
     return res.status(401).json({ message: 'Invalid credentials.' });
   }
 

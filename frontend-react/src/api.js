@@ -295,3 +295,21 @@ export function updateCommunityEventAccess(eventId, body) {
     body: JSON.stringify(body)
   });
 }
+
+// OAuth sign-in starts with a full-page navigation to the API, which redirects to Google/GitHub.
+export function oauthStartUrl(provider, params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return `${API_BASE}/auth/${encodeURIComponent(provider)}/start${query ? `?${query}` : ''}`;
+}
+
+export function fetchOAuthProviders() {
+  return request('/auth/providers');
+}
+
+export function fetchLinkedAccounts() {
+  return request('/auth/links');
+}
+
+export function unlinkProvider(provider) {
+  return request(`/auth/${encodeURIComponent(provider)}/link`, { method: 'DELETE' });
+}

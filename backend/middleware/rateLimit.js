@@ -29,4 +29,13 @@ const registerLimiter = rateLimit({
   handler: json('Too many registrations from this network. Try again later.')
 });
 
-module.exports = { apiLimiter, loginLimiter, registerLimiter };
+// OAuth start/callback answer with redirects (never 4xx), so every request counts.
+const oauthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  handler: json('Too many sign-in attempts. Try again in 15 minutes.')
+});
+
+module.exports = { apiLimiter, loginLimiter, registerLimiter, oauthLimiter };

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { register as registerRequest } from '../api';
+import { OAuthButtons, oauthErrorMessage } from '../components/OAuth';
 import { Button, FormField, TabPanel, Tabs } from '../components/ui';
 import { useAuth } from '../hooks/useAuth';
 import { homePathForRole } from '../utils/roles';
@@ -11,13 +12,19 @@ export default function LoginPage() {
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  // Results of a Google/GitHub round trip come back as ?oauth=pending or ?oauth_error=<code>.
+  const oauthError = searchParams.get('oauth_error');
+  const oauthPending = searchParams.get('oauth') === 'pending';
   const [mode, setMode] = useState('login');
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(oauthPending ? searchParams.get('username') || '' : '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState('tabulator');
-  const [error, setError] = useState(location.state?.notice || '');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState(oauthError ? oauthErrorMessage(oauthError) : location.state?.notice || '');
+  const [success, setSuccess] = useState(
+    oauthPending ? 'Registration submitted. An admin will approve your account, then sign in the same way.' : ''
+  );
   const [loading, setLoading] = useState(false);
 
   if (isAuthenticated) {
@@ -144,6 +151,7 @@ export default function LoginPage() {
               {isRegister ? 'Request access' : 'Sign in'}
             </Button>
           </form>
+          <OAuthButtons mode={mode} role={role} />
         </TabPanel>
       </div>
     </section>

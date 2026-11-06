@@ -18,6 +18,8 @@ const publicRoutes = require('./routes/publicRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const assignmentRoutes = require('./routes/assignmentRoutes');
 const rankingRoutes = require('./routes/rankingRoutes');
+const oauthRoutes = require('./routes/oauthRoutes');
+const { listProviders } = require('./controllers/oauthController');
 
 dotenv.config({ quiet: true });
 
@@ -72,6 +74,9 @@ app.get('/api', (req, res) => {
     res.json({ message: 'RankIT API is running' });
 });
 
+// Reads only environment config, so the login page can show its buttons even while the database is down.
+app.get('/api/auth/providers', listProviders);
+
 // Every other API route needs the database; connect lazily so cold starts reuse the cached pool.
 app.use('/api', async (req, res, next) => {
     await connectDB();
@@ -88,6 +93,7 @@ app.use('/api/public', publicRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/rankings', rankingRoutes);
+app.use('/api/auth', oauthRoutes);
 
 app.get('/', (req, res) => {
     res.status(200).json({
