@@ -3,7 +3,7 @@
   <h1>RankIT</h1>
   <p>Live, role-based tabulation and rankings for school events.</p>
 
-[![Version](https://img.shields.io/badge/version-3.0.1-blue?style=flat)](backend/package.json)
+[![Version](https://img.shields.io/badge/version-3.0.2-blue?style=flat)](backend/package.json)
 [![License](https://img.shields.io/badge/license-Sprucetrap%20Source--Available-lightgrey?style=flat)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jevoel16/RankIT/ci.yml?branch=V2.0-RankIT&label=CI&style=flat)](https://github.com/Jevoel16/RankIT/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-web-informational?style=flat)](#getting-started)
@@ -106,7 +106,7 @@ The seeders create demo accounts such as `mark` (admin) and `al` (tabulator) wit
 
 ## Configuration
 
-The API reads `backend/.env`; see [`backend/.env.example`](backend/.env.example). The frontend needs no variables in development: Vite proxies `/api` to the API.
+The API reads `backend/.env`; see [`backend/.env.example`](backend/.env.example), which has Local, Development and Production blocks (only Local is active). The frontend needs no variables in development: Vite proxies `/api` to the API.
 
 <details>
 <summary><b>Environment variables</b></summary>
