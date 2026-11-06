@@ -285,6 +285,20 @@ describe('events, scores and deductions', () => {
     expect(body.collections.users.every((user) => !('password' in user))).toBe(true);
   });
 
+  it('shows saved final results for finalized events', async () => {
+    const Event = require('../models/Event');
+    await Event.updateOne(
+      { _id: eventId },
+      {
+        eventStatus: 'finalized',
+        finalResults: [{ contestantId, contestantNumber: 1, contestantName: 'Official Winner', rank: 1, finalScore: 42 }]
+      }
+    );
+    const res = await request(app).get(`/api/public/leaderboard?eventId=${eventId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.leaderboard[0]).toMatchObject({ contestantName: 'Official Winner', liveRank: 1 });
+  });
+
   it('serves the public leaderboard without auth', async () => {
     const res = await request(app).get('/api/public/leaderboard');
     expect(res.status).toBe(200);

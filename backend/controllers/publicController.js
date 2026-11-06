@@ -210,7 +210,17 @@ const getPublicLeaderboard = async (req, res) => {
   }
 
   // Use final results if event is finalized, otherwise use live leaderboard
-  const displayLeaderboard = event.eventStatus === 'finalized' ? event.finalResults : leaderboard;
+  // Finalized events show their saved official results; events marked ended without a
+  // finalize step have none, so they keep the computed standings.
+  const finalResults = (event.finalResults || []).map((row) => ({
+    contestantId: row.contestantId,
+    contestantNumber: row.contestantNumber,
+    contestantName: row.contestantName,
+    liveRank: row.rank,
+    averageScore: row.finalScore ?? row.averageScore
+  }));
+  const displayLeaderboard =
+    event.eventStatus === 'finalized' && finalResults.length > 0 ? finalResults : leaderboard;
   const isLive = isEventLiveForCommunity(event);
   const winners = isLive ? [] : displayLeaderboard.slice(0, 3);
   
@@ -244,7 +254,7 @@ const getPublicLeaderboard = async (req, res) => {
       categoryRankingsEnabled: Boolean(communityAccess.categoryRankingsEnabled),
       overallRankingsEnabled: Boolean(communityAccess.overallRankingsEnabled)
     },
-    leaderboard,
+    leaderboard: displayLeaderboard,
     winners,
     latestUpdate,
     lastUpdatedAt: new Date().toISOString()
