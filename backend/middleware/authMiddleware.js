@@ -43,7 +43,10 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-const authorize = (...allowedRoles) => {
+// Superadmin inherits every route that admins can use.
+const authorize = (...roles) => {
+  const allowedRoles = roles.includes('admin') && !roles.includes('superadmin') ? [...roles, 'superadmin'] : roles;
+
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized request.' });

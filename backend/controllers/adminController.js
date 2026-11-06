@@ -30,7 +30,7 @@ const downloadBackup = async (req, res) => {
       Event.find().lean(),
       Contestant.find().lean(),
       ScoreSheet.find().lean(),
-      User.find().lean(),
+      User.find().select('-password').lean(),
       Audit.find().lean()
     ]);
 

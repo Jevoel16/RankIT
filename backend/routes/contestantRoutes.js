@@ -9,7 +9,7 @@ const {
 } = require('../controllers/contestantController');
 const { authenticate, authorize, authorizeEventAssignment } = require('../middleware/authMiddleware');
 
-router.get('/', authenticate, authorize('admin', 'tabulator', 'tallier', 'grievance'), authorizeEventAssignment({ eventIdSource: 'query', allowAdminRoles: ['admin', 'superadmin', 'grievance'] }), getContestantsByEvent);
+router.get('/', authenticate, authorize('admin', 'tabulator', 'grievance'), authorizeEventAssignment({ eventIdSource: 'query', allowAdminRoles: ['admin', 'superadmin', 'grievance'] }), getContestantsByEvent);
 router.post('/', authenticate, authorize('admin'), createContestant);
 router.patch('/:id', authenticate, authorize('admin'), updateContestant);
 router.post('/bulk', authenticate, authorize('admin'), bulkCreateContestants);

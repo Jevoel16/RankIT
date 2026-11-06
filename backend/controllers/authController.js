@@ -155,7 +155,7 @@ const getPendingUsers = async (req, res) => {
     if (req.user.role === 'superadmin') {
       allowedRoles = ['admin'];
     } else if (req.user.role === 'admin') {
-      allowedRoles = ['tabulator'];
+      allowedRoles = ['tabulator', 'grievance'];
     }
 
     const users = await User.find({
@@ -187,7 +187,7 @@ const updateApproval = async (req, res) => {
     const approverRole = req.user.role;
     const canSuperadminApprove = approverRole === 'superadmin' && targetUser.role === 'admin';
     const canAdminApprove =
-      approverRole === 'admin' && ['tabulator'].includes(targetUser.role);
+      approverRole === 'admin' && ['tabulator', 'grievance'].includes(targetUser.role);
 
     if (!canSuperadminApprove && !canAdminApprove) {
       return res.status(403).json({
