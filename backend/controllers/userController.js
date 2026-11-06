@@ -1,7 +1,9 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
-const { sendClientError } = require('../utils/httpErrors');
+const { HttpError, sendClientError } = require('../utils/httpErrors');
+
+const PRIVILEGED_ROLES = ['admin', 'superadmin'];
 
 const writeAudit = async ({ action, actorId, entityType, entityId, metadata }) => {
     try {
@@ -11,6 +13,17 @@ const writeAudit = async ({ action, actorId, entityType, entityId, metadata }) =
     }
 };
 
+// Role hierarchy for account management: admins manage tabulator and grievance accounts only;
+// admin and superadmin accounts (and granting the admin role) are superadmin-only.
+const assertCanManage = (actor, { targetRole, nextRole }) => {
+    if (actor.role === 'superadmin') return;
+    if (PRIVILEGED_ROLES.includes(targetRole) || PRIVILEGED_ROLES.includes(nextRole)) {
+        throw new HttpError(403, 'Only a superadmin can manage admin accounts.');
+    }
+};
+
+const domainUsername = (name, role) => `${String(name).split('@')[0].toLowerCase().trim()}@${role}.rankit`;
+
 const getUsers = async (req, res) => {
     const users = await User.find().select('-password').sort({ username: 1 });
     return res.json(users);
@@ -19,24 +32,17 @@ const getUsers = async (req, res) => {
 const createUser = async (req, res) => {
     try {
         const { username, password, role } = req.body;
+        assertCanManage(req.user, { nextRole: role });
 
-        if (!username || !password || !role) {
-            return res.status(400).json({ message: 'username, password, and role are required.' });
-        }
-
-        // Format domain-based username: username@role.rankit
-        const baseUsername = username.split('@')[0].toLowerCase().trim();
-        const domainUsername = `${baseUsername}@${role}.rankit`;
-
-        const existingUser = await User.findOne({ username: domainUsername });
+        const formatted = domainUsername(username, role);
+        const existingUser = await User.findOne({ username: formatted });
         if (existingUser) {
             return res.status(409).json({ message: 'Username already exists.' });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 12);
         const user = await User.create({
-            username: domainUsername,
-            password: hashedPassword,
+            username: formatted,
+            password: await bcrypt.hash(password, 12),
             role,
             isApproved: true,
             approvalStatus: 'approved'
@@ -47,12 +53,7 @@ const createUser = async (req, res) => {
             actorId: req.user._id,
             entityType: 'user',
             entityId: user._id,
-            metadata: { 
-                username: user.username, 
-                role: user.role, 
-                bypassApproval: true,
-                identityFormat: 'domain-based'
-            }
+            metadata: { username: user.username, role: user.role, bypassApproval: true, identityFormat: 'domain-based' }
         });
 
         return res.status(201).json({
@@ -63,6 +64,7 @@ const createUser = async (req, res) => {
             approvalStatus: user.approvalStatus
         });
     } catch (error) {
+        if (error instanceof HttpError) throw error;
         return sendClientError(res, error);
     }
 };
@@ -70,52 +72,62 @@ const createUser = async (req, res) => {
 const updateUser = async (req, res) => {
     try {
         const { username, role, password } = req.body;
-        const updates = {};
-
-        if (username) updates.username = username;
-        if (role) updates.role = role;
-        if (password) {
-            updates.password = await bcrypt.hash(password, 12);
+        const target = await User.findById(req.params.id).select('role username');
+        if (!target) {
+            return res.status(404).json({ message: 'User not found.' });
         }
+
+        assertCanManage(req.user, { targetRole: target.role, nextRole: role });
+
+        const nextRole = role || target.role;
+        const updates = {};
+        // Keep the name@role.rankit format whenever the name or role changes.
+        if (username || role) updates.username = domainUsername(username || target.username, nextRole);
+        if (role) updates.role = role;
+        if (password) updates.password = await bcrypt.hash(password, 12);
 
         // Revoke existing sessions when credentials or permissions change.
         const revokeSessions = Boolean(password || role);
 
-        const updatedUser = await User.findByIdAndUpdate(req.params.id, revokeSessions ? { ...updates, $inc: { tokenVersion: 1 } } : updates, {
-            new: true,
-            runValidators: true
-        }).select('-password');
-
-        if (!updatedUser) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
+        const updatedUser = await User.findByIdAndUpdate(
+            target._id,
+            revokeSessions ? { ...updates, $inc: { tokenVersion: 1 } } : updates,
+            { new: true, runValidators: true }
+        ).select('-password');
 
         await writeAudit({
             action: 'ADMIN_UPDATED_USER',
             actorId: req.user._id,
             entityType: 'user',
             entityId: updatedUser._id,
-            metadata: { updates: { username, role, passwordChanged: Boolean(password) } }
+            metadata: { updates: { username: updates.username, role, passwordChanged: Boolean(password) } }
         });
 
         return res.json(updatedUser);
     } catch (error) {
+        if (error instanceof HttpError) throw error;
         return sendClientError(res, error);
     }
 };
 
 const deleteUser = async (req, res) => {
-    const user = await User.findByIdAndDelete(req.params.id).select('-password');
-    if (!user) {
+    const target = await User.findById(req.params.id).select('role username');
+    if (!target) {
         return res.status(404).json({ message: 'User not found.' });
     }
+    if (String(target._id) === String(req.user._id)) {
+        throw new HttpError(400, 'You cannot delete your own account.');
+    }
+    assertCanManage(req.user, { targetRole: target.role });
+
+    await User.deleteOne({ _id: target._id });
 
     await writeAudit({
         action: 'ADMIN_DELETED_USER',
         actorId: req.user._id,
         entityType: 'user',
-        entityId: user._id,
-        metadata: { username: user.username, role: user.role }
+        entityId: target._id,
+        metadata: { username: target.username, role: target.role }
     });
 
     return res.json({ message: 'User deleted successfully.' });

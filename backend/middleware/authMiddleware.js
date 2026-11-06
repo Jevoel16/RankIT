@@ -2,16 +2,20 @@ const { COOKIE_NAME, verifySessionToken, clearSessionCookie } = require('../util
 const User = require('../models/User');
 const Event = require('../models/Event');
 
+// Only a single string id counts: repeated query params arrive as arrays, and Mongoose would
+// match any of them, letting a caller pair their own event with someone else's.
+const singleId = (value) => (typeof value === 'string' && value ? value : null);
+
 const resolveEventId = (req, source) => {
   if (source === 'params') {
-    return req.params.eventId || req.params.id;
+    return singleId(req.params.eventId || req.params.id);
   }
 
   if (source === 'query') {
-    return req.query.eventId || req.query.id;
+    return singleId(req.query.eventId) || singleId(req.query.id);
   }
 
-  return req.body.eventId || req.body.id;
+  return singleId(req.body.eventId) || singleId(req.body.id);
 };
 
 const authenticate = async (req, res, next) => {

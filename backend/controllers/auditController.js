@@ -2,7 +2,7 @@ const Audit = require('../models/Audit');
 
 const getAudits = async (req, res) => {
   const filter = {};
-  if (req.query.eventId) {
+  if (typeof req.query.eventId === 'string' && req.query.eventId) {
     filter.eventId = req.query.eventId;
   }
 

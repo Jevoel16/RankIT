@@ -131,6 +131,50 @@ describe('session cookie', () => {
   });
 });
 
+describe('account hierarchy', () => {
+  it('stops admins from changing or deleting a superadmin', async () => {
+    const admin = await loginAs(app, users.admin);
+    const reset = await admin.put(`/api/users/${users.superadmin._id}`).send({ password: 'hijacked-password' });
+    expect(reset.status).toBe(403);
+    const remove = await admin.delete(`/api/users/${users.superadmin._id}`);
+    expect(remove.status).toBe(403);
+  });
+
+  it('stops admins from granting the admin role', async () => {
+    const admin = await loginAs(app, users.admin);
+    const target = await createUser('promo', 'tabulator');
+    const promote = await admin.put(`/api/users/${target._id}`).send({ role: 'admin' });
+    expect(promote.status).toBe(403);
+    const create = await admin.post('/api/users').send({ username: 'newadmin', password: 'long-enough-pw', role: 'admin' });
+    expect(create.status).toBe(403);
+  });
+
+  it('lets admins manage tabulators and keeps the username format', async () => {
+    const admin = await loginAs(app, users.admin);
+    const target = await createUser('rename', 'tabulator');
+    const res = await admin.put(`/api/users/${target._id}`).send({ username: 'x@superadmin.rankit' });
+    expect(res.status).toBe(200);
+    expect(res.body.username).toBe('x@tabulator.rankit');
+  });
+
+  it('lets superadmin promote users but not delete itself', async () => {
+    const root = await loginAs(app, users.superadmin);
+    const target = await createUser('rising', 'tabulator');
+    const promote = await root.put(`/api/users/${target._id}`).send({ role: 'admin' });
+    expect(promote.status).toBe(200);
+    expect(promote.body.role).toBe('admin');
+    const self = await root.delete(`/api/users/${users.superadmin._id}`);
+    expect(self.status).toBe(400);
+  });
+
+  it('rejects repeated eventId query parameters', async () => {
+    const tab = await loginAs(app, users.tabulator);
+    const id = '0123456789abcdef01234567';
+    const res = await tab.get(`/api/contestants?eventId=${id}&eventId=${id}`);
+    expect(res.status).toBe(400);
+  });
+});
+
 describe('role guards', () => {
   it('forbids tabulators from the audit trail', async () => {
     const agent = await loginAs(app, users.tabulator);

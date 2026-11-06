@@ -14,8 +14,8 @@ const writeAudit = async ({ action, actorId, eventId, entityType, entityId, meta
 const getContestantsByEvent = async (req, res) => {
   const { eventId } = req.query;
 
-  if (!eventId) {
-    return res.status(400).json({ message: 'eventId query parameter is required.' });
+  if (typeof eventId !== 'string' || !eventId) {
+    return res.status(400).json({ message: 'A single eventId query parameter is required.' });
   }
 
   const contestants = await Contestant.find({ eventId }).sort({ contestantNumber: 1, name: 1 });
