@@ -71,6 +71,13 @@ The redirect URIs are `<APP_URL>/api/auth/google/callback` and `<APP_URL>/api/au
 defaults to the production domain on Vercel, so OAuth works on production; preview URLs change per deployment, so
 previews only allow password sign-in for existing accounts.
 
+Order of setup (the providers need the URL before you can get the keys):
+1. Deploy once (section 2) and note the production URL, e.g. `https://<project>.vercel.app`.
+2. Create the Google client and/or GitHub app below with that URL.
+3. Add the provider variables to Vercel (Production).
+4. **Redeploy** (Deployments → latest → Redeploy): new variables only reach new deployments.
+5. If you later add a custom domain, set `APP_URL` to it, update the callback URLs at each provider, and redeploy.
+
 **Google** (Google Cloud Console → APIs & Services):
 1. **OAuth consent screen**: app name `RankIT`, user type External, upload
    [`docs/brand/oauth-google-120.png`](brand/oauth-google-120.png) as the app logo, scopes `openid`, `email`,
@@ -138,8 +145,8 @@ On a preview URL first, then production:
   `Secure`, `SameSite=Lax`, and Local Storage has no token.
 - Record a score as a tabulator, file a deduction as grievance, and download a Master Report PDF as admin.
 - Six wrong passwords in a row return "Too many login attempts".
-- If OAuth is set up: "Continue with Google/GitHub" on a linked account lands on the role's console, and an
-  unlinked one shows "No RankIT account is linked".
+- If OAuth is set up: a first "Continue with Google/GitHub" asks for a password, then shows "Waiting for an admin
+  to assign your role"; once an admin assigns a role, the same button lands on the role's console.
 
 ## Rollback
 
