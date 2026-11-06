@@ -1,6 +1,7 @@
 const Contestant = require('../models/Contestant');
 const Event = require('../models/Event');
 const Audit = require('../models/Audit');
+const { sendClientError } = require('../utils/httpErrors');
 
 const writeAudit = async ({ action, actorId, eventId, entityType, entityId, metadata }) => {
   try {
@@ -11,18 +12,14 @@ const writeAudit = async ({ action, actorId, eventId, entityType, entityId, meta
 };
 
 const getContestantsByEvent = async (req, res) => {
-  try {
-    const { eventId } = req.query;
+  const { eventId } = req.query;
 
-    if (!eventId) {
-      return res.status(400).json({ message: 'eventId query parameter is required.' });
-    }
-
-    const contestants = await Contestant.find({ eventId }).sort({ contestantNumber: 1, name: 1 });
-    return res.json(contestants);
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
+  if (!eventId) {
+    return res.status(400).json({ message: 'eventId query parameter is required.' });
   }
+
+  const contestants = await Contestant.find({ eventId }).sort({ contestantNumber: 1, name: 1 });
+  return res.json(contestants);
 };
 
 const createContestant = async (req, res) => {
@@ -49,7 +46,7 @@ const createContestant = async (req, res) => {
     if (error && error.code === 11000) {
       return res.status(409).json({ message: 'Contestant number already exists for this event.' });
     }
-    return res.status(400).json({ message: error.message });
+    return sendClientError(res, error);
   }
 };
 
@@ -95,7 +92,7 @@ const updateContestant = async (req, res) => {
     if (error && error.code === 11000) {
       return res.status(409).json({ message: 'Contestant number already exists for this event.' });
     }
-    return res.status(400).json({ message: error.message });
+    return sendClientError(res, error);
   }
 };
 
@@ -134,7 +131,7 @@ const bulkCreateContestants = async (req, res) => {
         createdCount: created
       });
     }
-    return res.status(400).json({ message: error.message });
+    return sendClientError(res, error);
   }
 };
 
@@ -192,7 +189,7 @@ const deductContestantScore = async (req, res) => {
 
     return res.json(contestant);
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    return sendClientError(res, error);
   }
 };
 

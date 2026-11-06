@@ -4,6 +4,7 @@ const Contestant = require('../models/Contestant');
 const Audit = require('../models/Audit');
 const SportsMatch = require('../models/SportsMatch');
 const { computeGatekeeperState } = require('./eventController');
+const { sendClientError } = require('../utils/httpErrors');
 const {
   normalizeSportsStage,
   buildSportsStandings,
@@ -493,76 +494,49 @@ const recordOfflineScore = async (req, res) => {
       rankings
     });
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    return sendClientError(res, error);
   }
 };
 
 const getEventScores = async (req, res) => {
-  try {
-    const eventId = req.params.eventId || req.params.id;
-    const event = await Event.findById(eventId).select('name category criteria requiredTalliers eventStatus status');
+  const eventId = req.params.eventId || req.params.id;
+  const event = await Event.findById(eventId).select('name category criteria requiredTalliers eventStatus status');
 
-    if (!event) {
-      return res.status(404).json({ message: 'Event not found.' });
-    }
+  if (!event) {
+    return res.status(404).json({ message: 'Event not found.' });
+  }
 
-    if (event.category === 'Sports Events Category') {
-      const [sportsState, unlockState] = await Promise.all([
-        buildSportsState(event._id),
-        computeGatekeeperState(event._id)
-      ]);
-
-      const sportsRecords = [
-        ...(sportsState.bracket.pregameMatches || []),
-        ...(sportsState.bracket.top4Matches || []),
-        ...(sportsState.bracket.top3Matches || []),
-        ...(sportsState.bracket.top1Matches || [])
-      ]
-        .sort((a, b) => {
-          const stageOrder = { pregame: 1, top4: 2, top3: 3, top1: 4 };
-          if ((stageOrder[b.stage] || 0) !== (stageOrder[a.stage] || 0)) {
-            return (stageOrder[b.stage] || 0) - (stageOrder[a.stage] || 0);
-          }
-          return Number(b.matchNumber || 0) - Number(a.matchNumber || 0);
-        })
-        .map((match) => ({
-          _id: match._id,
-          stage: match.stage,
-          matchNumber: match.matchNumber,
-          physicalJudgeName: match.physicalJudgeName || '-',
-          contestantId: null,
-          contestantName: `${match.teamAName} vs ${match.teamBName}`,
-          contestantNumber: null,
-          totalScore: `${Number(match.teamAScore || 0).toFixed(2)} - ${Number(match.teamBScore || 0).toFixed(2)}`,
-          submittedAt: match.playedAt || null,
-          winnerName: match.winnerName || null
-        }));
-
-      return res.json({
-        eventId: event._id,
-        eventName: event.name,
-        criteria: event.criteria || [],
-        requiredTalliers: event.requiredTalliers,
-        unlockState,
-        records: sportsRecords,
-        rankings: sportsState.rankings,
-        sports: {
-          standings: sportsState.standings,
-          bracket: sportsState.bracket,
-          topFour: sportsState.topFour
-        }
-      });
-    }
-
-    const [records, rankings, unlockState] = await Promise.all([
-      ScoreSheet.find({ eventId: event._id })
-        .populate('contestantId', 'name contestantNumber')
-        .populate('filedOfflineBy', 'username role')
-        .sort({ submittedAt: -1 })
-        .lean(),
-      buildRankings(event._id),
+  if (event.category === 'Sports Events Category') {
+    const [sportsState, unlockState] = await Promise.all([
+      buildSportsState(event._id),
       computeGatekeeperState(event._id)
     ]);
+
+    const sportsRecords = [
+      ...(sportsState.bracket.pregameMatches || []),
+      ...(sportsState.bracket.top4Matches || []),
+      ...(sportsState.bracket.top3Matches || []),
+      ...(sportsState.bracket.top1Matches || [])
+    ]
+      .sort((a, b) => {
+        const stageOrder = { pregame: 1, top4: 2, top3: 3, top1: 4 };
+        if ((stageOrder[b.stage] || 0) !== (stageOrder[a.stage] || 0)) {
+          return (stageOrder[b.stage] || 0) - (stageOrder[a.stage] || 0);
+        }
+        return Number(b.matchNumber || 0) - Number(a.matchNumber || 0);
+      })
+      .map((match) => ({
+        _id: match._id,
+        stage: match.stage,
+        matchNumber: match.matchNumber,
+        physicalJudgeName: match.physicalJudgeName || '-',
+        contestantId: null,
+        contestantName: `${match.teamAName} vs ${match.teamBName}`,
+        contestantNumber: null,
+        totalScore: `${Number(match.teamAScore || 0).toFixed(2)} - ${Number(match.teamBScore || 0).toFixed(2)}`,
+        submittedAt: match.playedAt || null,
+        winnerName: match.winnerName || null
+      }));
 
     return res.json({
       eventId: event._id,
@@ -570,259 +544,274 @@ const getEventScores = async (req, res) => {
       criteria: event.criteria || [],
       requiredTalliers: event.requiredTalliers,
       unlockState,
-      records: records.map((item) => ({
-        _id: item._id,
-        contestantId: item.contestantId?._id || item.contestantId,
-        contestantName: item.contestantId?.name || 'Unknown',
-        contestantNumber: item.contestantId?.contestantNumber || null,
-        physicalJudgeName: item.physicalJudgeName,
-        filedOfflineBy: item.filedOfflineBy?.username || '',
-        totalScore: item.totalScore,
-        scores: item.scores || [],
-        submittedAt: item.submittedAt
-      })),
-      rankings
-    });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
-};
-
-const generateSportsTop4Pairings = async (req, res) => {
-  try {
-    const eventId = req.params.eventId;
-    const event = await Event.findById(eventId).select('category eventStatus');
-
-    if (!event) {
-      return res.status(404).json({ message: 'Event not found.' });
-    }
-
-    if (event.category !== 'Sports Events Category') {
-      return res.status(400).json({ message: 'Top-4 pairing generation is only available for sports events.' });
-    }
-
-    if (event.eventStatus === 'finalized') {
-      return res.status(403).json({ message: 'Cannot generate pairings: Event has been finalized.' });
-    }
-
-    const existingTop4 = await SportsMatch.find({ eventId, stage: 'top4' }).sort({ matchNumber: 1 }).lean();
-    if (existingTop4.length >= 2) {
-      const sportsState = await buildSportsState(eventId);
-      return res.json({
-        message: 'Top-4 pairings already exist.',
-        sports: {
-          standings: sportsState.standings,
-          bracket: sportsState.bracket,
-          topFour: sportsState.topFour
-        }
-      });
-    }
-
-    const { standings } = await buildSportsStandings(eventId);
-    const topFour = getTopFourFromPregame(standings);
-
-    if (topFour.length < 4) {
-      return res.status(400).json({ message: 'At least four teams are required to generate Top-4 pairings.' });
-    }
-
-    const randomized = shuffle(topFour);
-    const matchesToCreate = [
-      {
-        eventId,
-        stage: 'top4',
-        matchNumber: 1,
-        teamAContestantId: randomized[0].contestantId,
-        teamBContestantId: randomized[1].contestantId
-      },
-      {
-        eventId,
-        stage: 'top4',
-        matchNumber: 2,
-        teamAContestantId: randomized[2].contestantId,
-        teamBContestantId: randomized[3].contestantId
-      }
-    ];
-
-    await SportsMatch.insertMany(matchesToCreate);
-
-    await writeAudit({
-      action: 'SPORTS_TOP4_PAIRINGS_GENERATED',
-      actorId: req.user._id,
-      eventId,
-      entityType: 'event',
-      entityId: eventId,
-      metadata: {
-        seededTopFour: topFour.map((item) => ({ contestantId: item.contestantId, name: item.contestantName, pregameWins: item.pregameWins }))
-      }
-    });
-
-    const sportsState = await buildSportsState(eventId);
-
-    return res.status(201).json({
-      message: 'Top-4 pairings generated.',
+      records: sportsRecords,
+      rankings: sportsState.rankings,
       sports: {
         standings: sportsState.standings,
         bracket: sportsState.bracket,
         topFour: sportsState.topFour
       }
     });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
   }
+
+  const [records, rankings, unlockState] = await Promise.all([
+    ScoreSheet.find({ eventId: event._id })
+      .populate('contestantId', 'name contestantNumber')
+      .populate('filedOfflineBy', 'username role')
+      .sort({ submittedAt: -1 })
+      .lean(),
+    buildRankings(event._id),
+    computeGatekeeperState(event._id)
+  ]);
+
+  return res.json({
+    eventId: event._id,
+    eventName: event.name,
+    criteria: event.criteria || [],
+    requiredTalliers: event.requiredTalliers,
+    unlockState,
+    records: records.map((item) => ({
+      _id: item._id,
+      contestantId: item.contestantId?._id || item.contestantId,
+      contestantName: item.contestantId?.name || 'Unknown',
+      contestantNumber: item.contestantId?.contestantNumber || null,
+      physicalJudgeName: item.physicalJudgeName,
+      filedOfflineBy: item.filedOfflineBy?.username || '',
+      totalScore: item.totalScore,
+      scores: item.scores || [],
+      submittedAt: item.submittedAt
+    })),
+    rankings
+  });
+};
+
+const generateSportsTop4Pairings = async (req, res) => {
+  const eventId = req.params.eventId;
+  const event = await Event.findById(eventId).select('category eventStatus');
+
+  if (!event) {
+    return res.status(404).json({ message: 'Event not found.' });
+  }
+
+  if (event.category !== 'Sports Events Category') {
+    return res.status(400).json({ message: 'Top-4 pairing generation is only available for sports events.' });
+  }
+
+  if (event.eventStatus === 'finalized') {
+    return res.status(403).json({ message: 'Cannot generate pairings: Event has been finalized.' });
+  }
+
+  const existingTop4 = await SportsMatch.find({ eventId, stage: 'top4' }).sort({ matchNumber: 1 }).lean();
+  if (existingTop4.length >= 2) {
+    const sportsState = await buildSportsState(eventId);
+    return res.json({
+      message: 'Top-4 pairings already exist.',
+      sports: {
+        standings: sportsState.standings,
+        bracket: sportsState.bracket,
+        topFour: sportsState.topFour
+      }
+    });
+  }
+
+  const { standings } = await buildSportsStandings(eventId);
+  const topFour = getTopFourFromPregame(standings);
+
+  if (topFour.length < 4) {
+    return res.status(400).json({ message: 'At least four teams are required to generate Top-4 pairings.' });
+  }
+
+  const randomized = shuffle(topFour);
+  const matchesToCreate = [
+    {
+      eventId,
+      stage: 'top4',
+      matchNumber: 1,
+      teamAContestantId: randomized[0].contestantId,
+      teamBContestantId: randomized[1].contestantId
+    },
+    {
+      eventId,
+      stage: 'top4',
+      matchNumber: 2,
+      teamAContestantId: randomized[2].contestantId,
+      teamBContestantId: randomized[3].contestantId
+    }
+  ];
+
+  await SportsMatch.insertMany(matchesToCreate);
+
+  await writeAudit({
+    action: 'SPORTS_TOP4_PAIRINGS_GENERATED',
+    actorId: req.user._id,
+    eventId,
+    entityType: 'event',
+    entityId: eventId,
+    metadata: {
+      seededTopFour: topFour.map((item) => ({ contestantId: item.contestantId, name: item.contestantName, pregameWins: item.pregameWins }))
+    }
+  });
+
+  const sportsState = await buildSportsState(eventId);
+
+  return res.status(201).json({
+    message: 'Top-4 pairings generated.',
+    sports: {
+      standings: sportsState.standings,
+      bracket: sportsState.bracket,
+      topFour: sportsState.topFour
+    }
+  });
 };
 
 const getMasterEventResults = async (req, res) => {
-  try {
-    const eventId = req.params.eventId;
-    const event = await Event.findById(eventId).select('name criteria requiredTalliers category');
+  const eventId = req.params.eventId;
+  const event = await Event.findById(eventId).select('name criteria requiredTalliers category');
 
-    if (!event) {
-      return res.status(404).json({ message: 'Event not found.' });
-    }
+  if (!event) {
+    return res.status(404).json({ message: 'Event not found.' });
+  }
 
-    if (event.category === 'Sports Events Category') {
-      const [sportsState, gatekeeper] = await Promise.all([
-        buildSportsState(event._id),
-        computeGatekeeperState(event._id)
-      ]);
-
-      const scoreByRank = {
-        1: 10,
-        2: 7,
-        3: 5,
-        4: 3,
-        5: 2,
-        6: 1,
-        7: 0
-      };
-
-      const rows = (sportsState.rankings || [])
-        .slice(0, 7)
-        .map((row) => ({
-          contestantId: row.contestantId,
-          contestantNumber: row.contestantNumber || null,
-          contestantName: row.contestantName,
-          rank: Number(row.liveRank || 0),
-          wins: Number(row.wins || 0),
-          losses: Number(row.losses || 0),
-          rankingPoints: Number(scoreByRank[Number(row.liveRank || 0)] ?? 0)
-        }))
-        .sort((a, b) => a.rank - b.rank);
-
-      return res.json({
-        eventId: event._id,
-        eventName: event.name,
-        category: event.category,
-        criteria: [],
-        finalized: Boolean(gatekeeper?.unlocked),
-        requiredTalliers: event.requiredTalliers,
-        completedTalliers: Number(gatekeeper?.currentTallies || 0),
-        generatedByName: req.user?.username || 'Unknown User',
-        generatedByRole: req.user?.role || 'tabulator',
-        generatedAt: new Date().toISOString(),
-        isSportsEvent: true,
-        rankingScale: scoreByRank,
-        rows
-      });
-    }
-
-    const [contestants, records, gatekeeper] = await Promise.all([
-      Contestant.find({ eventId: event._id }).select('name contestantNumber grievances').sort({ contestantNumber: 1, name: 1 }).lean(),
-      ScoreSheet.find({ eventId: event._id }).select('contestantId scores physicalJudgeName filedOfflineBy submittedAt totalScore').lean(),
+  if (event.category === 'Sports Events Category') {
+    const [sportsState, gatekeeper] = await Promise.all([
+      buildSportsState(event._id),
       computeGatekeeperState(event._id)
     ]);
 
-    const criteriaLabels = (event.criteria || []).map((item) => item.label).filter(Boolean);
+    const scoreByRank = {
+      1: 10,
+      2: 7,
+      3: 5,
+      4: 3,
+      5: 2,
+      6: 1,
+      7: 0
+    };
 
-    const scoreBuckets = new Map();
-
-    records.forEach((record) => {
-      const contestantKey = record.contestantId.toString();
-      if (!scoreBuckets.has(contestantKey)) {
-        scoreBuckets.set(contestantKey, {});
-      }
-
-      const contestantScores = scoreBuckets.get(contestantKey);
-      (record.scores || []).forEach((score) => {
-        if (!score || !score.criteriaName) return;
-        if (!contestantScores[score.criteriaName]) {
-          contestantScores[score.criteriaName] = [];
-        }
-        contestantScores[score.criteriaName].push(Number(score.value || 0));
-      });
-    });
-
-    const rows = contestants.map((contestant) => {
-      const contestantKey = contestant._id.toString();
-      const perCriterion = scoreBuckets.get(contestantKey) || {};
-      const criterionScores = {};
-      let totalScore = 0;
-      const grievanceEntries = (contestant.grievances || []).map((entry) => ({
-        reason: String(entry?.reason || '').trim(),
-        deductionPoints: Number(entry?.deductionPoints || 0),
-        filedBy: String(entry?.filedBy || '').trim(),
-        timestamp: entry?.timestamp || null
-      }));
-      const deductionPoints = (contestant.grievances || []).reduce(
-        (sum, item) => sum + Number(item?.deductionPoints || 0),
-        0
-      );
-
-      criteriaLabels.forEach((label) => {
-        const values = perCriterion[label] || [];
-        if (values.length === 0) {
-          criterionScores[label] = null;
-          return;
-        }
-
-        const summedScore = values.reduce((sum, value) => sum + value, 0);
-        const roundedSummedScore = Number(summedScore.toFixed(2));
-        criterionScores[label] = roundedSummedScore;
-        totalScore += roundedSummedScore;
-      });
-
-      return {
-        contestantId: contestant._id,
-        contestantNumber: contestant.contestantNumber || null,
-        contestantName: contestant.name,
-        criterionScores,
-        deductionPoints: Number(deductionPoints.toFixed(2)),
-        deductionNotes: grievanceEntries,
-        totalScore: Number((totalScore - deductionPoints).toFixed(2)),
-        rawTotalScore: Number(totalScore.toFixed(2))
-      };
-    })
-      .sort((a, b) => {
-        if (Number(b.totalScore || 0) !== Number(a.totalScore || 0)) {
-          return Number(b.totalScore || 0) - Number(a.totalScore || 0);
-        }
-        if ((a.contestantNumber || 0) !== (b.contestantNumber || 0)) {
-          return (a.contestantNumber || 0) - (b.contestantNumber || 0);
-        }
-        return String(a.contestantName || '').localeCompare(String(b.contestantName || ''));
-      })
-      .map((row, index) => ({
-        ...row,
-        rank: index + 1,
-        eventScore: [10, 7, 5, 3, 2, 1, 0][index] ?? 0
-      }));
+    const rows = (sportsState.rankings || [])
+      .slice(0, 7)
+      .map((row) => ({
+        contestantId: row.contestantId,
+        contestantNumber: row.contestantNumber || null,
+        contestantName: row.contestantName,
+        rank: Number(row.liveRank || 0),
+        wins: Number(row.wins || 0),
+        losses: Number(row.losses || 0),
+        rankingPoints: Number(scoreByRank[Number(row.liveRank || 0)] ?? 0)
+      }))
+      .sort((a, b) => a.rank - b.rank);
 
     return res.json({
       eventId: event._id,
       eventName: event.name,
       category: event.category,
-      criteria: criteriaLabels,
+      criteria: [],
       finalized: Boolean(gatekeeper?.unlocked),
       requiredTalliers: event.requiredTalliers,
       completedTalliers: Number(gatekeeper?.currentTallies || 0),
       generatedByName: req.user?.username || 'Unknown User',
       generatedByRole: req.user?.role || 'tabulator',
       generatedAt: new Date().toISOString(),
+      isSportsEvent: true,
+      rankingScale: scoreByRank,
       rows
     });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
   }
+
+  const [contestants, records, gatekeeper] = await Promise.all([
+    Contestant.find({ eventId: event._id }).select('name contestantNumber grievances').sort({ contestantNumber: 1, name: 1 }).lean(),
+    ScoreSheet.find({ eventId: event._id }).select('contestantId scores physicalJudgeName filedOfflineBy submittedAt totalScore').lean(),
+    computeGatekeeperState(event._id)
+  ]);
+
+  const criteriaLabels = (event.criteria || []).map((item) => item.label).filter(Boolean);
+
+  const scoreBuckets = new Map();
+
+  records.forEach((record) => {
+    const contestantKey = record.contestantId.toString();
+    if (!scoreBuckets.has(contestantKey)) {
+      scoreBuckets.set(contestantKey, {});
+    }
+
+    const contestantScores = scoreBuckets.get(contestantKey);
+    (record.scores || []).forEach((score) => {
+      if (!score || !score.criteriaName) return;
+      if (!contestantScores[score.criteriaName]) {
+        contestantScores[score.criteriaName] = [];
+      }
+      contestantScores[score.criteriaName].push(Number(score.value || 0));
+    });
+  });
+
+  const rows = contestants.map((contestant) => {
+    const contestantKey = contestant._id.toString();
+    const perCriterion = scoreBuckets.get(contestantKey) || {};
+    const criterionScores = {};
+    let totalScore = 0;
+    const grievanceEntries = (contestant.grievances || []).map((entry) => ({
+      reason: String(entry?.reason || '').trim(),
+      deductionPoints: Number(entry?.deductionPoints || 0),
+      filedBy: String(entry?.filedBy || '').trim(),
+      timestamp: entry?.timestamp || null
+    }));
+    const deductionPoints = (contestant.grievances || []).reduce(
+      (sum, item) => sum + Number(item?.deductionPoints || 0),
+      0
+    );
+
+    criteriaLabels.forEach((label) => {
+      const values = perCriterion[label] || [];
+      if (values.length === 0) {
+        criterionScores[label] = null;
+        return;
+      }
+
+      const summedScore = values.reduce((sum, value) => sum + value, 0);
+      const roundedSummedScore = Number(summedScore.toFixed(2));
+      criterionScores[label] = roundedSummedScore;
+      totalScore += roundedSummedScore;
+    });
+
+    return {
+      contestantId: contestant._id,
+      contestantNumber: contestant.contestantNumber || null,
+      contestantName: contestant.name,
+      criterionScores,
+      deductionPoints: Number(deductionPoints.toFixed(2)),
+      deductionNotes: grievanceEntries,
+      totalScore: Number((totalScore - deductionPoints).toFixed(2)),
+      rawTotalScore: Number(totalScore.toFixed(2))
+    };
+  })
+    .sort((a, b) => {
+      if (Number(b.totalScore || 0) !== Number(a.totalScore || 0)) {
+        return Number(b.totalScore || 0) - Number(a.totalScore || 0);
+      }
+      if ((a.contestantNumber || 0) !== (b.contestantNumber || 0)) {
+        return (a.contestantNumber || 0) - (b.contestantNumber || 0);
+      }
+      return String(a.contestantName || '').localeCompare(String(b.contestantName || ''));
+    })
+    .map((row, index) => ({
+      ...row,
+      rank: index + 1,
+      eventScore: [10, 7, 5, 3, 2, 1, 0][index] ?? 0
+    }));
+
+  return res.json({
+    eventId: event._id,
+    eventName: event.name,
+    category: event.category,
+    criteria: criteriaLabels,
+    finalized: Boolean(gatekeeper?.unlocked),
+    requiredTalliers: event.requiredTalliers,
+    completedTalliers: Number(gatekeeper?.currentTallies || 0),
+    generatedByName: req.user?.username || 'Unknown User',
+    generatedByRole: req.user?.role || 'tabulator',
+    generatedAt: new Date().toISOString(),
+    rows
+  });
 };
 
 module.exports = {

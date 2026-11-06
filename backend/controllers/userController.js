@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
+const { sendClientError } = require('../utils/httpErrors');
 
 const writeAudit = async ({ action, actorId, entityType, entityId, metadata }) => {
     try {
@@ -11,12 +12,8 @@ const writeAudit = async ({ action, actorId, entityType, entityId, metadata }) =
 };
 
 const getUsers = async (req, res) => {
-    try {
-        const users = await User.find().select('-password').sort({ username: 1 });
-        return res.json(users);
-    } catch (error) {
-        return res.status(500).json({ message: error.message });
-    }
+    const users = await User.find().select('-password').sort({ username: 1 });
+    return res.json(users);
 };
 
 const createUser = async (req, res) => {
@@ -66,7 +63,7 @@ const createUser = async (req, res) => {
             approvalStatus: user.approvalStatus
         });
     } catch (error) {
-        return res.status(400).json({ message: error.message });
+        return sendClientError(res, error);
     }
 };
 
@@ -100,29 +97,25 @@ const updateUser = async (req, res) => {
 
         return res.json(updatedUser);
     } catch (error) {
-        return res.status(400).json({ message: error.message });
+        return sendClientError(res, error);
     }
 };
 
 const deleteUser = async (req, res) => {
-    try {
-        const user = await User.findByIdAndDelete(req.params.id).select('-password');
-        if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
-
-        await writeAudit({
-            action: 'ADMIN_DELETED_USER',
-            actorId: req.user._id,
-            entityType: 'user',
-            entityId: user._id,
-            metadata: { username: user.username, role: user.role }
-        });
-
-        return res.json({ message: 'User deleted successfully.' });
-    } catch (error) {
-        return res.status(500).json({ message: error.message });
+    const user = await User.findByIdAndDelete(req.params.id).select('-password');
+    if (!user) {
+        return res.status(404).json({ message: 'User not found.' });
     }
+
+    await writeAudit({
+        action: 'ADMIN_DELETED_USER',
+        actorId: req.user._id,
+        entityType: 'user',
+        entityId: user._id,
+        metadata: { username: user.username, role: user.role }
+    });
+
+    return res.json({ message: 'User deleted successfully.' });
 };
 
 module.exports = {

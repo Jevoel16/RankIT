@@ -497,97 +497,81 @@ const calculateOverallRankings = async () => {
 };
 
 const getCategoryRankings = async (req, res) => {
-  try {
-    const categoryName = String(req.params.categoryName || '').trim();
+  const categoryName = String(req.params.categoryName || '').trim();
 
-    if (!categoryName) {
-      return res.status(400).json({ message: 'categoryName is required.' });
-    }
-
-    const rankings = await calculateCategoryRankings(categoryName);
-
-    return res.json({
-      category: rankings[0]?.categoryName || categoryName,
-      count: rankings.length,
-      rankings,
-      calculatedAt: new Date().toISOString()
-    });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
+  if (!categoryName) {
+    return res.status(400).json({ message: 'categoryName is required.' });
   }
+
+  const rankings = await calculateCategoryRankings(categoryName);
+
+  return res.json({
+    category: rankings[0]?.categoryName || categoryName,
+    count: rankings.length,
+    rankings,
+    calculatedAt: new Date().toISOString()
+  });
 };
 
 const getOverallRankings = async (req, res) => {
-  try {
-    const rankings = await calculateOverallRankings();
+  const rankings = await calculateOverallRankings();
 
-    await writeAudit({
-      action: 'OVERALL_RANKINGS_CALCULATED',
-      actorId: req.user?._id,
-      entityType: 'system',
-      entityId: new mongoose.Types.ObjectId(),
-      metadata: {
-        contenderCount: rankings.length,
-        calculatedAt: new Date().toISOString(),
-        weightedPointsByRank: WEIGHTED_POINTS_BY_RANK
-      }
-    });
+  await writeAudit({
+    action: 'OVERALL_RANKINGS_CALCULATED',
+    actorId: req.user?._id,
+    entityType: 'system',
+    entityId: new mongoose.Types.ObjectId(),
+    metadata: {
+      contenderCount: rankings.length,
+      calculatedAt: new Date().toISOString(),
+      weightedPointsByRank: WEIGHTED_POINTS_BY_RANK
+    }
+  });
 
-    return res.json({
-      count: rankings.length,
-      weightedPointsByRank: WEIGHTED_POINTS_BY_RANK,
-      rankings,
-      calculatedAt: new Date().toISOString()
-    });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
+  return res.json({
+    count: rankings.length,
+    weightedPointsByRank: WEIGHTED_POINTS_BY_RANK,
+    rankings,
+    calculatedAt: new Date().toISOString()
+  });
 };
 
 const getPublicOverallRankings = async (_req, res) => {
-  try {
-    const access = await getOrCreateCommunityAccess();
-    if (!access.overallRankingsEnabled) {
-      return res.status(403).json({ message: 'Overall rankings are currently hidden from the community.' });
-    }
-
-    const rankings = await calculateOverallRankings();
-
-    return res.json({
-      count: rankings.length,
-      weightedPointsByRank: WEIGHTED_POINTS_BY_RANK,
-      rankings,
-      calculatedAt: new Date().toISOString()
-    });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
+  const access = await getOrCreateCommunityAccess();
+  if (!access.overallRankingsEnabled) {
+    return res.status(403).json({ message: 'Overall rankings are currently hidden from the community.' });
   }
+
+  const rankings = await calculateOverallRankings();
+
+  return res.json({
+    count: rankings.length,
+    weightedPointsByRank: WEIGHTED_POINTS_BY_RANK,
+    rankings,
+    calculatedAt: new Date().toISOString()
+  });
 };
 
 const getPublicCategoryRankings = async (req, res) => {
-  try {
-    const access = await getOrCreateCommunityAccess();
-    if (!access.categoryRankingsEnabled) {
-      return res.status(403).json({ message: 'Category rankings are currently hidden from the community.' });
-    }
-
-    const categoryName = String(req.params.categoryName || '').trim();
-
-    if (!categoryName) {
-      return res.status(400).json({ message: 'categoryName is required.' });
-    }
-
-    const rankings = await calculateCategoryRankings(categoryName);
-
-    return res.json({
-      category: rankings[0]?.categoryName || categoryName,
-      count: rankings.length,
-      rankings,
-      calculatedAt: new Date().toISOString()
-    });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
+  const access = await getOrCreateCommunityAccess();
+  if (!access.categoryRankingsEnabled) {
+    return res.status(403).json({ message: 'Category rankings are currently hidden from the community.' });
   }
+
+  const categoryName = String(req.params.categoryName || '').trim();
+
+  if (!categoryName) {
+    return res.status(400).json({ message: 'categoryName is required.' });
+  }
+
+  const rankings = await calculateCategoryRankings(categoryName);
+
+  return res.json({
+    category: rankings[0]?.categoryName || categoryName,
+    count: rankings.length,
+    rankings,
+    calculatedAt: new Date().toISOString()
+  });
 };
 
 module.exports = {

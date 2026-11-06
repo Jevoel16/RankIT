@@ -99,7 +99,7 @@ const authorizeEventAssignment = ({
       req.eventAccess = { eventId, event };
       return next();
     } catch (error) {
-      return res.status(500).json({ message: error.message });
+      return next(error);
     }
   };
 };

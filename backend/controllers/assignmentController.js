@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Event = require('../models/Event');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
+const { sendClientError } = require('../utils/httpErrors');
 
 const writeAudit = async ({ action, actorId, eventId, entityType, entityId, metadata }) => {
   try {
@@ -17,24 +18,20 @@ const toUniqueIds = (items) => {
 };
 
 const getApprovedUsersByRole = async (req, res) => {
-  try {
-    const role = String(req.query.role || '').trim();
-    if (!['tabulator', 'tallier'].includes(role)) {
-      return res.status(400).json({ message: 'role query must be tabulator or tallier.' });
-    }
-
-    const users = await User.find({
-      role,
-      isApproved: true,
-      approvalStatus: 'approved'
-    })
-      .select('_id username role')
-      .sort({ username: 1 });
-
-    return res.json(users);
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
+  const role = String(req.query.role || '').trim();
+  if (!['tabulator', 'tallier'].includes(role)) {
+    return res.status(400).json({ message: 'role query must be tabulator or tallier.' });
   }
+
+  const users = await User.find({
+    role,
+    isApproved: true,
+    approvalStatus: 'approved'
+  })
+    .select('_id username role')
+    .sort({ username: 1 });
+
+  return res.json(users);
 };
 
 const assignTabulatorToEvent = async (req, res) => {
@@ -77,7 +74,7 @@ const assignTabulatorToEvent = async (req, res) => {
 
     return res.json(event);
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    return sendClientError(res, error);
   }
 };
 
@@ -133,65 +130,61 @@ const assignTalliersToEvent = async (req, res) => {
 
     return res.json(populated);
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    return sendClientError(res, error);
   }
 };
 
 const getTabulatorEventAssignmentSummary = async (req, res) => {
-  try {
-    const tabulatorId = req.user._id;
+  const tabulatorId = req.user._id;
 
-    const pipeline = [
-      {
-        $match: {
-          tabulatorId: new mongoose.Types.ObjectId(tabulatorId)
-        }
-      },
-      {
-        $lookup: {
-          from: 'scoresheets',
-          let: { eventId: '$_id' },
-          pipeline: [
-            { $match: { $expr: { $eq: ['$eventId', '$$eventId'] } } },
-            { $group: { _id: '$tallierId' } }
-          ],
-          as: 'activeTallierDocs'
-        }
-      },
-      {
-        $project: {
-          _id: 1,
-          name: 1,
-          category: 1,
-          createdAt: 1,
-          assignedTallierIds: 1,
-          totalAssignedTalliers: { $size: { $ifNull: ['$assignedTallierIds', []] } },
-          activeTallierIds: '$activeTallierDocs._id'
-        }
-      },
-      {
-        $project: {
-          _id: 1,
-          name: 1,
-          category: 1,
-          createdAt: 1,
-          totalAssignedTalliers: 1,
-          activeTalliers: {
-            $size: {
-              $setIntersection: [{ $ifNull: ['$assignedTallierIds', []] }, { $ifNull: ['$activeTallierIds', []] }]
-            }
+  const pipeline = [
+    {
+      $match: {
+        tabulatorId: new mongoose.Types.ObjectId(tabulatorId)
+      }
+    },
+    {
+      $lookup: {
+        from: 'scoresheets',
+        let: { eventId: '$_id' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$eventId', '$$eventId'] } } },
+          { $group: { _id: '$tallierId' } }
+        ],
+        as: 'activeTallierDocs'
+      }
+    },
+    {
+      $project: {
+        _id: 1,
+        name: 1,
+        category: 1,
+        createdAt: 1,
+        assignedTallierIds: 1,
+        totalAssignedTalliers: { $size: { $ifNull: ['$assignedTallierIds', []] } },
+        activeTallierIds: '$activeTallierDocs._id'
+      }
+    },
+    {
+      $project: {
+        _id: 1,
+        name: 1,
+        category: 1,
+        createdAt: 1,
+        totalAssignedTalliers: 1,
+        activeTalliers: {
+          $size: {
+            $setIntersection: [{ $ifNull: ['$assignedTallierIds', []] }, { $ifNull: ['$activeTallierIds', []] }]
           }
         }
-      },
-      { $sort: { createdAt: -1 } }
-    ];
+      }
+    },
+    { $sort: { createdAt: -1 } }
+  ];
 
-    const summary = await Event.aggregate(pipeline);
+  const summary = await Event.aggregate(pipeline);
 
-    return res.json(summary);
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
+  return res.json(summary);
 };
 
 module.exports = {

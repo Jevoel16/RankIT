@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Audit = require('../models/Audit');
+const { sendClientError } = require('../utils/httpErrors');
 
 const createToken = (userId) => {
   const secret = process.env.JWT_SECRET;
@@ -85,90 +86,82 @@ const registerUser = async (req, res) => {
       }
     });
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    return sendClientError(res, error);
   }
 };
 
 const loginUser = async (req, res) => {
-  try {
-    const { username, password } = req.body;
+  const { username, password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ message: 'username and password are required.' });
-    }
-
-    // Accept both formats: "user" (will search as user@role.rankit for all roles) or "user@role.rankit"
-    let searchUsername = username.toLowerCase().trim();
-    
-    // If user provided without domain, we need to validate against domain format
-    // For now, accept full domain format
-    let user = await User.findOne({ username: searchUsername });
-    
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
-    }
-
-    if (!user.isApproved) {
-      return res.status(403).json({
-        message: user.approvalStatus === 'rejected' ? 'Account rejected by admin.' : 'Pending Admin Approval.'
-      });
-    }
-
-    const token = createToken(user._id.toString());
-
-    // Log login audit entry
-    await writeAudit({
-      action: 'USER_LOGGED_IN',
-      actorId: user._id,
-      entityType: 'user',
-      entityId: user._id,
-      metadata: {
-        username: user.username,
-        role: user.role,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-    return res.json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        role: user.role,
-        isApproved: user.isApproved
-      }
-    });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
+  if (!username || !password) {
+    return res.status(400).json({ message: 'username and password are required.' });
   }
+
+  // Accept both formats: "user" (will search as user@role.rankit for all roles) or "user@role.rankit"
+  let searchUsername = username.toLowerCase().trim();
+  
+  // If user provided without domain, we need to validate against domain format
+  // For now, accept full domain format
+  let user = await User.findOne({ username: searchUsername });
+  
+  if (!user) {
+    return res.status(401).json({ message: 'Invalid credentials.' });
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    return res.status(401).json({ message: 'Invalid credentials.' });
+  }
+
+  if (!user.isApproved) {
+    return res.status(403).json({
+      message: user.approvalStatus === 'rejected' ? 'Account rejected by admin.' : 'Pending Admin Approval.'
+    });
+  }
+
+  const token = createToken(user._id.toString());
+
+  // Log login audit entry
+  await writeAudit({
+    action: 'USER_LOGGED_IN',
+    actorId: user._id,
+    entityType: 'user',
+    entityId: user._id,
+    metadata: {
+      username: user.username,
+      role: user.role,
+      timestamp: new Date().toISOString()
+    }
+  });
+
+  return res.json({
+    token,
+    user: {
+      id: user._id,
+      username: user.username,
+      role: user.role,
+      isApproved: user.isApproved
+    }
+  });
 };
 
 const getPendingUsers = async (req, res) => {
-  try {
-    let allowedRoles = [];
+  let allowedRoles = [];
 
-    if (req.user.role === 'superadmin') {
-      allowedRoles = ['admin'];
-    } else if (req.user.role === 'admin') {
-      allowedRoles = ['tabulator', 'grievance'];
-    }
-
-    const users = await User.find({
-      approvalStatus: 'pending',
-      role: { $in: allowedRoles }
-    })
-      .select('-password')
-      .sort({ createdAt: 1 });
-
-    return res.json(users);
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
+  if (req.user.role === 'superadmin') {
+    allowedRoles = ['admin'];
+  } else if (req.user.role === 'admin') {
+    allowedRoles = ['tabulator', 'grievance'];
   }
+
+  const users = await User.find({
+    approvalStatus: 'pending',
+    role: { $in: allowedRoles }
+  })
+    .select('-password')
+    .sort({ createdAt: 1 });
+
+  return res.json(users);
 };
 
 const updateApproval = async (req, res) => {
@@ -216,7 +209,7 @@ const updateApproval = async (req, res) => {
 
     return res.json(user);
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    return sendClientError(res, error);
   }
 };
 
@@ -270,7 +263,7 @@ const adminCreateUser = async (req, res) => {
       approvalStatus: user.approvalStatus
     });
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    return sendClientError(res, error);
   }
 };
 

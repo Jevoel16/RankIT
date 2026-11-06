@@ -2,6 +2,7 @@ const Event = require('../models/Event');
 const ScoreSheet = require('../models/ScoreSheet');
 const Audit = require('../models/Audit');
 const User = require('../models/User');
+const { sendClientError } = require('../utils/httpErrors');
 
 let attemptedLegacyCategoryIndexDrop = false;
 
@@ -90,38 +91,30 @@ const computeGatekeeperState = async (eventId) => {
 };
 
 const getEvents = async (req, res) => {
-    try {
-        const role = req.user?.role;
-        const userId = req.user?._id?.toString();
-        const query = {};
+    const role = req.user?.role;
+    const userId = req.user?._id?.toString();
+    const query = {};
 
-        if (role === 'tabulator') {
-            query.tabulatorId = userId;
-        } else if (role === 'tallier') {
-            query.assignedTallierIds = userId;
-        }
-
-        const events = await Event.find(query)
-            .populate('tabulatorId', 'username role')
-            .populate('assignedTallierIds', 'username role')
-            .sort({ createdAt: -1 });
-        return res.json(events);
-    } catch (error) {
-        return res.status(500).json({ message: error.message });
+    if (role === 'tabulator') {
+        query.tabulatorId = userId;
+    } else if (role === 'tallier') {
+        query.assignedTallierIds = userId;
     }
+
+    const events = await Event.find(query)
+        .populate('tabulatorId', 'username role')
+        .populate('assignedTallierIds', 'username role')
+        .sort({ createdAt: -1 });
+    return res.json(events);
 };
 
 const getEvent = async (req, res) => {
-    try {
-        const event = await Event.findById(req.params.id);
-        if (!event) {
-            return res.status(404).json({ message: 'Event not found.' });
-        }
-
-        return res.json(event);
-    } catch (error) {
-        return res.status(500).json({ message: error.message });
+    const event = await Event.findById(req.params.id);
+    if (!event) {
+        return res.status(404).json({ message: 'Event not found.' });
     }
+
+    return res.json(event);
 };
 
 const createEvent = async (req, res) => {
@@ -231,7 +224,7 @@ const createEvent = async (req, res) => {
             return res.status(409).json({ message: 'Duplicate key conflict while creating event.' });
         }
 
-        return res.status(400).json({ message: error.message });
+        return sendClientError(res, error);
     }
 };
 
@@ -320,199 +313,187 @@ const updateEvent = async (req, res) => {
 
         return res.json(updated);
     } catch (error) {
-        return res.status(400).json({ message: error.message });
+        return sendClientError(res, error);
     }
 };
 
 const deleteEvent = async (req, res) => {
-    try {
-        const event = await Event.findByIdAndDelete(req.params.id);
-        if (!event) {
-            return res.status(404).json({ message: 'Event not found.' });
-        }
-
-        await writeAudit({
-            action: 'ADMIN_DELETED_EVENT',
-            actorId: req.user._id,
-            eventId: event._id,
-            entityType: 'event',
-            entityId: event._id,
-            metadata: { name: event.name, category: event.category }
-        });
-
-        return res.json({ message: 'Event deleted successfully.' });
-    } catch (error) {
-        return res.status(500).json({ message: error.message });
+    const event = await Event.findByIdAndDelete(req.params.id);
+    if (!event) {
+        return res.status(404).json({ message: 'Event not found.' });
     }
+
+    await writeAudit({
+        action: 'ADMIN_DELETED_EVENT',
+        actorId: req.user._id,
+        eventId: event._id,
+        entityType: 'event',
+        entityId: event._id,
+        metadata: { name: event.name, category: event.category }
+    });
+
+    return res.json({ message: 'Event deleted successfully.' });
 };
 
 const getEventUnlockStatus = async (req, res) => {
-    try {
-        const state = await computeGatekeeperState(req.params.id);
-        if (!state) {
-            return res.status(404).json({ message: 'Event not found.' });
-        }
-
-        return res.json(state);
-    } catch (error) {
-        return res.status(500).json({ message: error.message });
+    const state = await computeGatekeeperState(req.params.id);
+    if (!state) {
+        return res.status(404).json({ message: 'Event not found.' });
     }
+
+    return res.json(state);
 };
 
 const patchEventStatus = async (req, res) => {
-    try {
-        const { eventId } = req.params;
-        const { eventStatus } = req.body;
-        const adminId = req.user?._id;
+    const { eventId } = req.params;
+    const { eventStatus } = req.body;
+    const adminId = req.user?._id;
 
-        // Validate input
-        if (!['scheduled', 'live', 'finalized'].includes(eventStatus)) {
-            return res.status(400).json({ message: 'Invalid event status. Must be scheduled, live, or finalized.' });
-        }
-
-        const event = await Event.findById(eventId);
-        if (!event) {
-            return res.status(404).json({ message: 'Event not found.' });
-        }
-
-        // Additional checks for finalization
-        if (eventStatus === 'finalized') {
-            // Verify gatekeeper logic is satisfied (all required talliers submitted)
-            const tallyCount = await ScoreSheet.distinct('physicalJudgeName', { eventId });
-            if (tallyCount.length < event.requiredTalliers) {
-                return res.status(400).json({ 
-                    message: `Cannot finalize: Only ${tallyCount.length} of ${event.requiredTalliers} required talliers have submitted.` 
-                });
-            }
-
-            // Calculate final rankings using aggregation pipeline
-            const Contestant = require('../models/Contestant');
-            
-            const finalRankings = await Contestant.aggregate([
-                {
-                    $match: { eventId: event._id }
-                },
-                {
-                    $lookup: {
-                        from: 'scoresheets',
-                        let: { contestantId: '$_id' },
-                        pipeline: [
-                            {
-                                $match: {
-                                    $expr: {
-                                        $and: [
-                                            { $eq: ['$contestantId', '$$contestantId'] },
-                                            { $eq: ['$eventId', event._id] }
-                                        ]
-                                    }
-                                }
-                            },
-                            {
-                                $group: {
-                                    _id: null,
-                                    averageScore: { $avg: '$totalScore' }
-                                }
-                            }
-                        ],
-                        as: 'stats'
-                    }
-                },
-                {
-                    $unwind: {
-                        path: '$stats',
-                        preserveNullAndEmptyArrays: true
-                    }
-                },
-                {
-                    $addFields: {
-                        averageScore: { $ifNull: ['$stats.averageScore', 0] },
-                        deductionPoints: {
-                            $sum: {
-                                $map: {
-                                    input: { $ifNull: ['$grievances', []] },
-                                    as: 'entry',
-                                    in: { $ifNull: ['$$entry.deductionPoints', 0] }
-                                }
-                            }
-                        }
-                    }
-                },
-                {
-                    $addFields: {
-                        finalScore: { $subtract: ['$averageScore', '$deductionPoints'] }
-                    }
-                },
-                {
-                    $sort: { finalScore: -1, averageScore: -1 }
-                },
-                {
-                    $group: {
-                        _id: null,
-                        results: {
-                            $push: {
-                                contestantId: '$_id',
-                                contestantNumber: '$contestantNumber',
-                                contestantName: '$name',
-                                averageScore: '$averageScore',
-                                totalDeductions: '$deductionPoints',
-                                finalScore: '$finalScore'
-                            }
-                        }
-                    }
-                },
-                {
-                    $unwind: {
-                        path: '$results',
-                        includeArrayIndex: 'rank'
-                    }
-                },
-                {
-                    $addFields: {
-                        'results.rank': { $add: ['$rank', 1] }
-                    }
-                },
-                {
-                    $replaceRoot: { newRoot: '$results' }
-                }
-            ]);
-
-            event.finalResults = finalRankings;
-            event.finalizedAt = new Date();
-            event.finalizedBy = adminId;
-        }
-
-        // Update event status
-        event.eventStatus = eventStatus;
-        await event.save();
-
-        // Log audit trail
-        await writeAudit({
-            action: `EVENT_${eventStatus.toUpperCase()}`,
-            actorId: adminId,
-            eventId: event._id,
-            entityType: 'event',
-            entityId: event._id,
-            metadata: {
-                eventName: event.name,
-                previousStatus: event.eventStatus,
-                newStatus: eventStatus,
-                finalResultsCount: eventStatus === 'finalized' ? event.finalResults.length : 0
-            }
-        });
-
-        return res.status(200).json({
-            message: `Event status updated to ${eventStatus}`,
-            event: {
-                _id: event._id,
-                name: event.name,
-                eventStatus: event.eventStatus,
-                finalizedAt: event.finalizedAt,
-                finalResults: event.finalResults
-            }
-        });
-    } catch (error) {
-        return res.status(500).json({ message: error.message });
+    // Validate input
+    if (!['scheduled', 'live', 'finalized'].includes(eventStatus)) {
+        return res.status(400).json({ message: 'Invalid event status. Must be scheduled, live, or finalized.' });
     }
+
+    const event = await Event.findById(eventId);
+    if (!event) {
+        return res.status(404).json({ message: 'Event not found.' });
+    }
+
+    // Additional checks for finalization
+    if (eventStatus === 'finalized') {
+        // Verify gatekeeper logic is satisfied (all required talliers submitted)
+        const tallyCount = await ScoreSheet.distinct('physicalJudgeName', { eventId });
+        if (tallyCount.length < event.requiredTalliers) {
+            return res.status(400).json({ 
+                message: `Cannot finalize: Only ${tallyCount.length} of ${event.requiredTalliers} required talliers have submitted.` 
+            });
+        }
+
+        // Calculate final rankings using aggregation pipeline
+        const Contestant = require('../models/Contestant');
+        
+        const finalRankings = await Contestant.aggregate([
+            {
+                $match: { eventId: event._id }
+            },
+            {
+                $lookup: {
+                    from: 'scoresheets',
+                    let: { contestantId: '$_id' },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ['$contestantId', '$$contestantId'] },
+                                        { $eq: ['$eventId', event._id] }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            $group: {
+                                _id: null,
+                                averageScore: { $avg: '$totalScore' }
+                            }
+                        }
+                    ],
+                    as: 'stats'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$stats',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $addFields: {
+                    averageScore: { $ifNull: ['$stats.averageScore', 0] },
+                    deductionPoints: {
+                        $sum: {
+                            $map: {
+                                input: { $ifNull: ['$grievances', []] },
+                                as: 'entry',
+                                in: { $ifNull: ['$$entry.deductionPoints', 0] }
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                $addFields: {
+                    finalScore: { $subtract: ['$averageScore', '$deductionPoints'] }
+                }
+            },
+            {
+                $sort: { finalScore: -1, averageScore: -1 }
+            },
+            {
+                $group: {
+                    _id: null,
+                    results: {
+                        $push: {
+                            contestantId: '$_id',
+                            contestantNumber: '$contestantNumber',
+                            contestantName: '$name',
+                            averageScore: '$averageScore',
+                            totalDeductions: '$deductionPoints',
+                            finalScore: '$finalScore'
+                        }
+                    }
+                }
+            },
+            {
+                $unwind: {
+                    path: '$results',
+                    includeArrayIndex: 'rank'
+                }
+            },
+            {
+                $addFields: {
+                    'results.rank': { $add: ['$rank', 1] }
+                }
+            },
+            {
+                $replaceRoot: { newRoot: '$results' }
+            }
+        ]);
+
+        event.finalResults = finalRankings;
+        event.finalizedAt = new Date();
+        event.finalizedBy = adminId;
+    }
+
+    // Update event status
+    event.eventStatus = eventStatus;
+    await event.save();
+
+    // Log audit trail
+    await writeAudit({
+        action: `EVENT_${eventStatus.toUpperCase()}`,
+        actorId: adminId,
+        eventId: event._id,
+        entityType: 'event',
+        entityId: event._id,
+        metadata: {
+            eventName: event.name,
+            previousStatus: event.eventStatus,
+            newStatus: eventStatus,
+            finalResultsCount: eventStatus === 'finalized' ? event.finalResults.length : 0
+        }
+    });
+
+    return res.status(200).json({
+        message: `Event status updated to ${eventStatus}`,
+        event: {
+            _id: event._id,
+            name: event.name,
+            eventStatus: event.eventStatus,
+            finalizedAt: event.finalizedAt,
+            finalResults: event.finalResults
+        }
+    });
 };
 
 module.exports = {
