@@ -35,6 +35,6 @@ test('renders the public community page with staff login', async () => {
     </MemoryRouter>
   );
 
-  expect(await screen.findByRole('link', { name: /staff login/i })).toBeInTheDocument();
+  expect(await screen.findByRole('link', { name: /staff sign in/i })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: /sprucetrap/i })).toHaveAttribute('href', 'https://github.com/Jevoel16');
 });

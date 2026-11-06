@@ -1,0 +1,109 @@
+/* Design tokens. Dark is the default; ThemeProvider sets data-theme to the resolved theme
+   (light, dark, or the system preference). Legacy names (--bg, --panel, ...) are kept so
+   existing rules keep working while pages move to the UI kit. */
+:root {
+  color-scheme: dark;
+
+  /* Color */
+  --bg: #0b1017;
+  --panel: #121a24;
+  --panel-2: #1a2430;
+  --surface-inset: #0d141e;
+  --border: #2a3a4d;
+  --border-subtle: #223144;
+  --text: #f4f7ff;
+  --muted: #9baac0;
+  --accent: #2fd0ff;
+  --accent-strong: #6ec8ff;
+  --on-accent: #06180f;
+  --warn: #f2b94b;
+  --ok: #22c98d;
+  --danger: #ff5f6d;
+  --focus-ring: 0 0 0 3px rgba(47, 208, 255, 0.45);
+  --overlay: rgba(4, 8, 14, 0.72);
+  --gradient-brand: linear-gradient(90deg, var(--accent), var(--ok));
+  --gradient-brand-vertical: linear-gradient(180deg, var(--accent) 0%, var(--ok) 100%);
+  --page-glow: #1a2636;
+
+  /* Medal colors for podiums and rank badges */
+  --gold: #ffd700;
+  --silver: #c0c0c0;
+  --bronze: #cd7f32;
+
+  /* Typography */
+  --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, 'Courier New', monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-display: clamp(2rem, 4vw + 1rem, 4.5rem);
+
+  /* Spacing (4px scale) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Shape and depth */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.4);
+
+  /* Motion and layers */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration: 160ms;
+  --z-header: 30;
+  --z-drawer: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+
+  /* Layout */
+  --header-height: 60px;
+  --content-max: 1280px;
+  --tap-target: 44px;
+  /* Breakpoints (for reference; CSS vars can't be used in media queries):
+     sm 480px, md 768px, lg 1024px, xl 1280px */
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f2f6fc;
+  --panel: #ffffff;
+  --panel-2: #f7f9fd;
+  --surface-inset: #eef3f9;
+  --border: #cbd8ea;
+  --border-subtle: #d8e3f0;
+  --text: #0f1c2d;
+  --muted: #51637a;
+  --accent: #0e7fd0;
+  --accent-strong: #0a6bb0;
+  --on-accent: #ffffff;
+  --warn: #b26f00;
+  --ok: #117a50;
+  --danger: #c43544;
+  --focus-ring: 0 0 0 3px rgba(14, 127, 208, 0.35);
+  --overlay: rgba(15, 28, 45, 0.45);
+  --page-glow: #e3edf8;
+
+  --shadow-sm: 0 1px 2px rgba(31, 56, 84, 0.1);
+  --shadow-md: 0 10px 24px rgba(31, 56, 84, 0.12);
+  --shadow-lg: 0 18px 44px rgba(31, 56, 84, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration: 0ms;
+  }
+}

@@ -2,38 +2,56 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 const ThemeContext = createContext(null);
 const THEME_STORAGE_KEY = 'rankit_theme';
+const PREFERENCES = ['light', 'dark', 'system'];
+const LIGHT_QUERY = '(prefers-color-scheme: light)';
 
-function getInitialTheme() {
+function getInitialPreference() {
   try {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    if (saved === 'light' || saved === 'dark') {
-      return saved;
-    }
+    if (PREFERENCES.includes(saved)) return saved;
   } catch (_error) {
-    // Ignore storage errors and fallback to dark.
+    // Storage can be unavailable; fall back to the system theme.
   }
-  return 'dark';
+  return 'system';
+}
+
+function systemTheme() {
+  return typeof window !== 'undefined' && window.matchMedia?.(LIGHT_QUERY).matches ? 'light' : 'dark';
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(getInitialTheme);
+  const [preference, setPreference] = useState(getInitialPreference);
+  const [system, setSystem] = useState(systemTheme);
+
+  useEffect(() => {
+    const query = window.matchMedia?.(LIGHT_QUERY);
+    if (!query) return undefined;
+    const onChange = () => setSystem(query.matches ? 'light' : 'dark');
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+
+  const theme = preference === 'system' ? system : preference;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
+      localStorage.setItem(THEME_STORAGE_KEY, preference);
     } catch (_error) {
       // Ignore storage failures.
     }
-  }, [theme]);
+  }, [theme, preference]);
 
   const value = useMemo(
     () => ({
       theme,
-      setTheme,
-      toggleTheme: () => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+      preference,
+      setPreference: (next) => setPreference(PREFERENCES.includes(next) ? next : 'system'),
+      // Cycles light -> dark -> system for a single toggle button.
+      cyclePreference: () => setPreference((current) => PREFERENCES[(PREFERENCES.indexOf(current) + 1) % 3]),
+      toggleTheme: () => setPreference(theme === 'dark' ? 'light' : 'dark')
     }),
-    [theme]
+    [theme, preference]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

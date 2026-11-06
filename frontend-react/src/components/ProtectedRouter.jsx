@@ -1,13 +1,10 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { normalizeRole } from '../utils/roles';
 
 export default function ProtectedRouter({ roles, children }) {
   const { isAuthenticated, user } = useAuth();
   const location = useLocation();
-  const normalizedRole = user?.role === 'tallier' ? 'tabulator' : user?.role;
-  const normalizedRoles = Array.isArray(roles)
-    ? roles.map((role) => (role === 'tallier' ? 'tabulator' : role))
-    : roles;
 
   if (!isAuthenticated) {
     return (
@@ -19,7 +16,8 @@ export default function ProtectedRouter({ roles, children }) {
     );
   }
 
-  if (normalizedRoles && normalizedRoles.length > 0 && !normalizedRoles.includes(normalizedRole)) {
+  const allowed = (roles || []).map(normalizeRole);
+  if (allowed.length > 0 && !allowed.includes(normalizeRole(user?.role))) {
     return <Navigate to="/?notice=Access%20Denied:%20Incorrect%20Role" replace />;
   }
 

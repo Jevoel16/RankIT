@@ -1,10 +1,10 @@
 body {
   margin: 0;
-  font-family: 'Segoe UI', 'Trebuchet MS', Verdana, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 code {
-  font-family: Consolas, 'Courier New', monospace;
+  font-family: var(--font-mono);
 }

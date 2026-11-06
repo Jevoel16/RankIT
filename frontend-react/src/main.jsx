@@ -5,6 +5,7 @@ import App from './App';
 import { AuthProvider } from './hooks/useAuth';
 import { ActiveEventProvider } from './hooks/useActiveEvent';
 import { ThemeProvider } from './hooks/useTheme';
+import { ToastProvider } from './components/ui';
 import './index.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -18,9 +19,11 @@ root.render(
     >
       <AuthProvider>
         <ThemeProvider>
-          <ActiveEventProvider>
-            <App />
-          </ActiveEventProvider>
+          <ToastProvider>
+            <ActiveEventProvider>
+              <App />
+            </ActiveEventProvider>
+          </ToastProvider>
         </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>

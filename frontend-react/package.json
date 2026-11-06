@@ -1,6 +1,6 @@
 {
   "name": "frontend-react",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "private": true,
   "dependencies": {
     "@react-pdf/renderer": "^4.3.2",

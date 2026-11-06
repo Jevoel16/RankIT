@@ -1,7 +1,6 @@
   import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { fetchPublicCategoryRankings, fetchPublicLeaderboard, fetchPublicOverallLeaderboard } from '../api';
-import { useAuth } from '../hooks/useAuth';
 import usePagination from '../hooks/usePagination';
 import TablePager from '../components/TablePager';
 
@@ -27,7 +26,7 @@ const getRankPoints = (rank) => {
 };
 
 export default function CommunityHome() {
-  const { isAuthenticated } = useAuth();
+
   const location = useLocation();
   const notice = useMemo(() => new URLSearchParams(location.search).get('notice') || '', [location.search]);
 
@@ -281,18 +280,6 @@ export default function CommunityHome() {
   const categoryAccessEnabled = Boolean(rankingAccess.categoryRankingsEnabled);
   const overallAccessEnabled = Boolean(rankingAccess.overallRankingsEnabled);
 
-  const publicTopbar = !isAuthenticated ? (
-    <div className="community-topbar">
-      <Link to="/" className="community-brand">
-        <img src="/logo.ico" alt="" className="brand-logo-icon" aria-hidden="true" />
-        <span>RankIT</span>
-      </Link>
-      <Link to="/login" className="community-login no-print">
-        Staff Login
-      </Link>
-    </div>
-  ) : null;
-
   useEffect(() => {
     if (activeTab === TAB_CATEGORY && !categoryAccessEnabled) {
       setActiveTab(TAB_EVENT);
@@ -306,7 +293,6 @@ export default function CommunityHome() {
 
   const renderLoadingShell = (message) => (
     <>
-      {publicTopbar}
       <section className="panel community-shell">
         <p className="muted">{message}</p>
       </section>
@@ -320,7 +306,6 @@ export default function CommunityHome() {
   if (eventPayload?.noActiveEvent) {
     return (
       <>
-        {publicTopbar}
         <section className="panel community-shell community-empty">
           <h1>RankIT Community View</h1>
           <p className="muted">Stay tuned for the next event.</p>
@@ -331,7 +316,6 @@ export default function CommunityHome() {
 
   return (
     <>
-      {publicTopbar}
       <section className="panel community-shell">
         <header className="community-header">
         <div className="community-headline">
