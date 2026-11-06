@@ -22,4 +22,13 @@ const communityAccessSchema = new mongoose.Schema(
   }
 );
 
+// Atomic upsert so concurrent first requests can't race to create the singleton twice.
+communityAccessSchema.statics.getSingleton = function getSingleton(key = 'public-rankings') {
+  return this.findOneAndUpdate(
+    { key },
+    { $setOnInsert: { key } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+};
+
 module.exports = mongoose.model('CommunityAccess', communityAccessSchema);

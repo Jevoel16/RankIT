@@ -7,12 +7,7 @@ const { buildSportsStandings, buildSportsRankings } = require('../utils/sportsSt
 
 const COMMUNITY_ACCESS_KEY = 'public-rankings';
 
-const getOrCreateCommunityAccess = async () => {
-  const existing = await CommunityAccess.findOne({ key: COMMUNITY_ACCESS_KEY });
-  if (existing) return existing;
-
-  return CommunityAccess.create({ key: COMMUNITY_ACCESS_KEY });
-};
+const getOrCreateCommunityAccess = () => CommunityAccess.getSingleton(COMMUNITY_ACCESS_KEY);
 
 const isEventLiveForCommunity = (event) => {
   const eventStatus = String(event?.eventStatus || '').toLowerCase();
