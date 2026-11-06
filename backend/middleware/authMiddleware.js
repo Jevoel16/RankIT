@@ -29,7 +29,7 @@ const authenticate = async (req, res, next) => {
       return res.status(500).json({ message: 'JWT secret is not configured.' });
     }
 
-    const payload = jwt.verify(token, secret);
+    const payload = jwt.verify(token, secret, { algorithms: ['HS256'] });
     const user = await User.findById(payload.userId).select('-password');
 
     if (!user) {

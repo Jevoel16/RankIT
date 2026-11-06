@@ -33,7 +33,7 @@ const createUser = async (req, res) => {
             return res.status(409).json({ message: 'Username already exists.' });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, 12);
         const user = await User.create({
             username: domainUsername,
             password: hashedPassword,
@@ -75,7 +75,7 @@ const updateUser = async (req, res) => {
         if (username) updates.username = username;
         if (role) updates.role = role;
         if (password) {
-            updates.password = await bcrypt.hash(password, 10);
+            updates.password = await bcrypt.hash(password, 12);
         }
 
         const updatedUser = await User.findByIdAndUpdate(req.params.id, updates, {

@@ -14,7 +14,7 @@ const createToken = (userId) => {
   return jwt.sign(
     { userId },
     secret,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '12h', algorithm: 'HS256' }
   );
 };
 
@@ -52,7 +52,7 @@ const registerUser = async (req, res) => {
       return res.status(409).json({ message: 'Username already exists. Please choose a different username.' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const user = await User.create({
       username: domainUsername,
       password: hashedPassword,
@@ -238,7 +238,7 @@ const adminCreateUser = async (req, res) => {
       return res.status(403).json({ message: 'Creating superadmin accounts is not allowed.' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const user = await User.create({
       username,
       password: hashedPassword,

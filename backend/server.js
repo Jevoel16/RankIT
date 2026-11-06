@@ -1,9 +1,12 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const dotenv = require('dotenv');
 const path = require('path');
 const connectDB = require('./config/db');
 const { errorHandler, notFoundHandler } = require('./utils/httpErrors');
+const { rejectOperatorKeys } = require('./middleware/validate');
+const { apiLimiter, loginLimiter, registerLimiter } = require('./middleware/rateLimit');
 const userRoutes = require('./routes/userRoutes');
 const eventRoutes = require('./routes/eventRoutes');
 const scoresRoutes = require('./routes/scoresRoutes');
@@ -17,12 +20,38 @@ const rankingRoutes = require('./routes/rankingRoutes');
 
 dotenv.config({ quiet: true });
 
+const corsOptions = require('./config/cors');
+
 const app = express();
 
 app.set('trust proxy', 1);
 
-app.use(cors());
+app.disable('x-powered-by');
+app.use(
+    helmet({
+        // Only matters when Express also serves the built SPA (non-Vercel production).
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'"],
+                styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+                fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+                imgSrc: ["'self'", 'data:', 'blob:'],
+                connectSrc: ["'self'"],
+                workerSrc: ["'self'", 'blob:'],
+                frameSrc: ["'self'", 'blob:'],
+                objectSrc: ["'none'"],
+                frameAncestors: ["'none'"]
+            }
+        }
+    })
+);
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '100kb' }));
+app.use(rejectOperatorKeys);
+app.use('/api', apiLimiter);
+app.use('/api/users/login', loginLimiter);
+app.use('/api/users/register', registerLimiter);
 
 if (process.env.NODE_ENV === 'production') {
     app.use((req, res, next) => {

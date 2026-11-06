@@ -10,20 +10,22 @@ const {
     patchEventStatus
 } = require('../controllers/eventController');
 const { authenticate, authorize, authorizeEventAssignment } = require('../middleware/authMiddleware');
+const { validateBody } = require('../middleware/validate');
+const schemas = require('../validation/schemas');
 
 router
     .route('/')
     .get(authenticate, authorize('admin', 'tabulator', 'grievance'), getEvents)
-    .post(authenticate, authorize('admin'), createEvent);
+    .post(authenticate, authorize('admin'), validateBody(schemas.createEvent), createEvent);
 
 router
     .route('/:id')
     .get(authenticate, authorize('admin', 'tabulator', 'grievance'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'superadmin', 'grievance'] }), getEvent)
-    .put(authenticate, authorize('admin'), updateEvent)
+    .put(authenticate, authorize('admin'), validateBody(schemas.updateEvent), updateEvent)
     .delete(authenticate, authorize('admin'), deleteEvent);
 
 router.get('/:id/unlock-status', authenticate, authorize('admin', 'tabulator', 'grievance'), authorizeEventAssignment({ eventIdSource: 'params', allowAdminRoles: ['admin', 'superadmin', 'grievance'] }), getEventUnlockStatus);
 
-router.patch('/:eventId/status', authenticate, authorize('admin'), patchEventStatus);
+router.patch('/:eventId/status', authenticate, authorize('admin'), validateBody(schemas.eventStatus), patchEventStatus);
 
 module.exports = router;

@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const { assertLocalDatabase } = require('./guard');
 
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
@@ -23,8 +24,10 @@ async function seedUsers() {
     throw new Error('MONGODB_URI is required in backend/.env');
   }
 
+  assertLocalDatabase(process.env.MONGODB_URI);
   await mongoose.connect(process.env.MONGODB_URI);
-  const hashedPassword = await bcrypt.hash('1234', 10);
+  // Demo password for local development only; override with SEED_PASSWORD.
+  const hashedPassword = await bcrypt.hash(process.env.SEED_PASSWORD || '1234', 12);
 
   for (const user of usersToSeed) {
     // Format: username@role.rankit
@@ -45,7 +48,7 @@ async function seedUsers() {
     );
   }
 
-  console.log('✅ Seeded users with domain-based identities (password for all: 1234):');
+  console.log('✅ Seeded users with domain-based identities (shared demo password, see README):');
   usersToSeed.forEach((user) => {
     const domainUsername = `${user.username.split('@')[0]}@${user.role}.rankit`.toLowerCase();
     console.log(`- ${domainUsername} (${user.role}) status=${user.approvalStatus}`);

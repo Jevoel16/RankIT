@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 
 const User = require('../models/User');
+const { assertLocalDatabase } = require('./guard');
 const Event = require('../models/Event');
 const Contestant = require('../models/Contestant');
 const ScoreSheet = require('../models/ScoreSheet');
@@ -84,6 +85,7 @@ async function seedEvents() {
     throw new Error('MONGODB_URI is required in backend/.env');
   }
 
+  assertLocalDatabase(process.env.MONGODB_URI);
   await mongoose.connect(process.env.MONGODB_URI);
 
   const approvedTabulators = await User.find({
