@@ -3,6 +3,7 @@ const globals = require('globals');
 
 module.exports = [
   { ignores: ['node_modules/**'] },
+  { files: ['**/*.mjs'], languageOptions: { sourceType: 'module' } },
   js.configs.recommended,
   {
     files: ['**/*.js'],
@@ -17,6 +18,6 @@ module.exports = [
   },
   {
     files: ['**/*.test.js', 'tests/**/*.js'],
-    languageOptions: { globals: { ...globals.node, ...globals.vitest } }
+    languageOptions: { sourceType: 'module', globals: { ...globals.node, ...globals.vitest } }
   }
 ];
