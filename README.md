@@ -1,170 +1,161 @@
-# RankIT
+<div align="center">
+  <img src="frontend-react/public/logo192.png" alt="RankIT logo" width="80">
+  <h1>RankIT</h1>
+  <p>Live, role-based tabulation and rankings for school events.</p>
 
-RankIT is a role-based event tabulation platform for school events.
+[![Version](https://img.shields.io/badge/version-2.4.1-blue?style=flat)](backend/package.json)
+[![License](https://img.shields.io/badge/license-Sprucetrap%20Source--Available-lightgrey?style=flat)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Jevoel16/RankIT/ci.yml?branch=V2.0-RankIT&label=CI&style=flat)](https://github.com/Jevoel16/RankIT/actions/workflows/ci.yml)
+[![Platform](https://img.shields.io/badge/platform-web-informational?style=flat)](#getting-started)
 
-It has:
-- A public community page for live rankings
-- A staff dashboard with role-based access (superadmin, admin, tabulator, grievance)
-- Event setup, score recording, ranking computation, audit logs, and report exports
+</div>
+
+---
+
+## About
+
+RankIT runs the scoring side of school competitions: admins set up events and criteria, tabulators record judges' scores, grievance officers file deductions, and everyone else watches live rankings on a public page. It replaces spreadsheets passed between judges with one auditable system that computes event, category and overall weighted rankings and prints the official reports.
+
+[Back to top](#rankit)
+
+---
+
+## Features
+
+- Public live leaderboard by event, category and overall weighted ranking
+- Role consoles for superadmin, admin, tabulator and grievance staff
+- Criteria-based and set-based (sports) scoring with automatic rankings
+- Auditable grievance deductions with reasons
+- Master report PDFs: main results, deduction notes, weighted rankings
+- Audit trail and analytics for superadmins
+- Light, dark and system themes; works on phones and tablets
+
+[Back to top](#rankit)
+
+---
 
 ## Tech Stack
 
-- Frontend: React + Vite
-- Backend: Node.js + Express
-- Database: MongoDB
-- Auth: JWT
+| Layer | Tools |
+|---|---|
+| Frontend | React 19.3.1, React Router 6.30.6, Vite 6.4.5, @react-pdf/renderer 4.9.0 |
+| Backend | Node.js 22.14.0, Express 5.2.1, Mongoose 9.12.0, Zod 4.6.7, Helmet 8.3.0 |
+| Database | MongoDB (Atlas in production) |
+| Testing | Vitest 4.1.12, Supertest, mongodb-memory-server |
+| Hosting | Vercel (web + API), MongoDB Atlas |
 
-## What The App Is Expected To Do
+[Back to top](#rankit)
 
-### Public (no login)
+---
 
-- View event rankings
-- View category rankings (when enabled by admin)
-- View overall rankings (when enabled by admin)
-- See event status and visible events only
+## Getting Started
 
-### Admin
-
-- Manage user approvals and manual user creation
-- Create events (including criteria-based and sports flows)
-- Assign tabulators to events
-- Manage contestants with dedicated Add Contestants and Update Contestants views
-- Control community visibility/settings
-- Generate Master Report Preview with Main Report, Deduction Notes, Overall Weighted Ranking, and Category Weighted Ranking tabs
-
-### Superadmin
-
-- Full user oversight (approval, create, users directory)
-- View analytics dashboard
-- View audit trail and export reports
-
-### Tabulator
-
-- Record offline scores
-- Manage event scoring workflow
-- Generate reports (including tabulation/master outputs)
-
-### Grievance
-
-- View grievance-related score context
-- Apply deduction entries with reasons
-- Keep deduction actions auditable
-
-## Local Setup (Fresh Machine)
-
-## 1. Prerequisites
-
-- Node.js 18+
-- npm 9+
-- MongoDB running locally or a MongoDB Atlas URI
-
-## 2. Configure Environment Variables
-
-Create backend/.env:
-
-```env
-PORT=5000
-HOST=0.0.0.0
-MONGODB_URI=mongodb://localhost:27017/RankIT_DB
-JWT_SECRET=change-this-secret
-JWT_EXPIRES_IN=12h
-```
-
-Create frontend-react/.env:
-
-```env
-VITE_API_URL=http://localhost:5000/api
-```
-
-Notes:
-- MONGODB_URI is required.
-- If VITE_API_URL is missing, frontend falls back to current-host:5000/api.
-
-## 3. Install Dependencies
-
-In terminal 1:
+Prerequisites: Node.js 22+, and MongoDB running locally (or an Atlas URI).
 
 ```bash
-cd backend
-npm install
+cp backend/.env.example backend/.env           # then set JWT_SECRET
+npm ci --prefix backend && npm ci --prefix frontend-react
+npm run seed:users --prefix backend && npm run seed:events --prefix backend
+npm run dev --prefix backend                   # API on http://localhost:5000
+npm start --prefix frontend-react              # app on http://localhost:3000
 ```
 
-In terminal 2:
+The seeders create demo accounts such as `mark@admin.rankit` and `al@tabulator.rankit` with the password from `SEED_PASSWORD` (default `1234`). They only run against a local database.
 
-```bash
-cd frontend-react
-npm install
+[Back to top](#rankit)
+
+---
+
+## Configuration
+
+The API reads `backend/.env`; see [`backend/.env.example`](backend/.env.example). The frontend needs no variables in development: Vite proxies `/api` to the API.
+
+<details>
+<summary><b>Environment variables</b></summary>
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `MONGODB_URI` | backend | MongoDB connection string |
+| `JWT_SECRET` | backend | Signs session cookies; use a long random value |
+| `JWT_EXPIRES_IN` | backend | Session length, e.g. `12h` |
+| `CORS_ORIGIN` | backend | Allowed browser origins (required in production) |
+| `PORT`, `HOST` | backend | Local server bind (default `5000`, `0.0.0.0`) |
+| `SEED_PASSWORD` | backend | Demo password for the local seeders |
+| `VITE_DEV_API_TARGET` | frontend | Where the dev proxy sends `/api` (default `http://localhost:5000`) |
+| `VITE_API_URL` | frontend | Only if the API is on another origin (default `/api`) |
+
+</details>
+
+[Back to top](#rankit)
+
+---
+
+## Usage
+
+1. **Admin** creates an event with its criteria (or sets for sports), adds contestants and assigns a tabulator.
+2. **Tabulator** records each judge's scores; rankings update immediately.
+3. **Grievance** files deductions with a reason when a rule is broken.
+4. **Everyone** follows the public page at `/`; admins choose which events and ranking views are visible.
+5. **Admin** prints the master report when the event is finalized.
+
+Deploying: see [docs/deployment.md](docs/deployment.md).
+
+[Back to top](#rankit)
+
+---
+
+## More
+
+<details>
+<summary><b>Project structure</b></summary>
+
+```
+backend/          Express API: routes, controllers, models, validation, tests, seed scripts
+frontend-react/   React app: pages, components (ui kit), hooks, styles
+docs/             Deployment guide
+.github/          CI workflow
 ```
 
-## 4. Optional Seed Data
+</details>
 
-From backend folder:
+<details>
+<summary><b>Scripts</b></summary>
 
-```bash
-npm run seed:users
-npm run seed:events
-```
+| Package | Script | Does |
+|---|---|---|
+| backend | `npm run dev` | API with auto-reload |
+| backend | `npm test` | API tests (in-memory MongoDB) |
+| backend | `npm run lint` | ESLint |
+| backend | `npm run seed:users` / `seed:events` | Local demo data |
+| backend | `npm run create:superadmin` | First superadmin for any database |
+| frontend-react | `npm start` | Dev server with `/api` proxy |
+| frontend-react | `npm test` / `npm run lint` | Unit tests / ESLint |
+| frontend-react | `npm run build` / `npm run preview` | Production build / serve it with production headers |
 
-Default seeded password: 1234
+</details>
 
-Sample seeded usernames:
-- jevoel@superadmin.rankit
-- mark@admin.rankit
-- al@tabulator.rankit
-- kibra@grievance.rankit
+[Back to top](#rankit)
 
-## 5. Run The App
+---
 
-In backend folder:
+## Contributing
 
-```bash
-npm run dev
-```
+Work on a `feat/...` or `fix/...` branch and use Conventional Commits with the bumped version at the end of the subject, e.g. `feat: add CSV export (v2.5.0)`. Keep `npm run lint`, `npm test` and `npm run build` green, and update this README with every change.
 
-In frontend-react folder:
+[Back to top](#rankit)
 
-```bash
-npm start
-```
+---
 
-Expected local URLs:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:5000/api
+## License
 
-## Quick Verification Checklist
+Source-available under the [Sprucetrap Source-Available License 1.0](LICENSE): free for non-commercial use with credit.
 
-- Backend starts and connects to MongoDB
-- Frontend loads at / and shows Community page
-- Login works with a seeded account
-- Admin can create event and manage users
-- Superadmin can open Analytics, User Oversight, and Audit Trail
-- Tabulator can load assigned event scoring flow
+[Back to top](#rankit)
 
-## Routing Notes
+---
 
-- Primary role routes:
-  - `/tabulator`
-  - `/grievance`
-  - `/admin`
-  - `/superadmin`
+## Author
 
-## Common Issues
+[Sprucetrap (@Jevoel16)](https://github.com/Jevoel16)
 
-- API unreachable from frontend:
-  - Check frontend-react/.env VITE_API_URL
-  - Ensure backend is running on port 5000
-
-- MongoDB connection error:
-  - Verify MONGODB_URI in backend/.env
-  - Verify MongoDB service/cluster access
-
-- Access from another device on same network:
-  - Use your PC LAN IP instead of localhost in VITE_API_URL
-  - Open frontend via http://YOUR_LAN_IP:3000
-  - Allow firewall inbound ports 3000 and 5000
-
-## Project Structure
-
-- backend: Express API, MongoDB models, controllers, routes, seed scripts
-- frontend-react: React app, pages/components/hooks, report UI and exports
-
+[Back to top](#rankit)
