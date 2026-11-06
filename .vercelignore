@@ -1,6 +1,7 @@
 # Local/dependency/build artifacts
 node_modules/
 frontend-react/node_modules/
+backend/node_modules/
 frontend-react/build/
 
 # Local env files
@@ -9,7 +10,11 @@ frontend-react/.env
 frontend-react/.env.*
 backend/.env
 
-# Documentation and local config (not needed by runtime deployment bundle)
+# Not needed at runtime: docs, tests and local-only scripts (seeders must never run in production)
 *.md
+docs/
+backend/tests/
+backend/scripts/
+.github/
 .vscode/
 .idea/

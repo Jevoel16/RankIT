@@ -2,9 +2,9 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { readFileSync } from 'node:fs';
 
-// `vite preview` serves the production headers from vercel.json so CSP issues show up locally.
+// `vite preview` serves the production headers from the root vercel.json so CSP issues show up locally.
 const vercelHeaders = Object.fromEntries(
-  JSON.parse(readFileSync(new URL('./vercel.json', import.meta.url), 'utf8')).headers[0].headers.map(({ key, value }) => [key, value])
+  JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')).headers[0].headers.map(({ key, value }) => [key, value])
 );
 delete vercelHeaders['Strict-Transport-Security'];
 

@@ -1,14 +1,15 @@
 # Deploying RankIT (Vercel + MongoDB Atlas)
 
-RankIT deploys as **two Vercel projects from the same GitHub repository** plus a MongoDB Atlas cluster:
+RankIT deploys as **one Vercel project** from the GitHub repository, plus a MongoDB Atlas cluster. The root
+[`vercel.json`](../vercel.json) does everything:
 
-| Piece | Vercel project | Root directory | What it serves |
-|---|---|---|---|
-| API | `rankit-api` | `backend` | Express API as one serverless function (`api/index.js`) |
-| Web | `rankit` | `frontend-react` | Static Vite build; `/api/*` is rewritten to `rankit-api` |
+| Path | Served by |
+|---|---|
+| `/api/*` | The Express API as one serverless function ([`api/index.js`](../api/index.js) loads `backend/server.js`) |
+| everything else | The static Vite build from `frontend-react/build` (SPA fallback to `index.html`) |
 
-The web project proxies `/api/*` to the API project, so the browser only ever talks to one origin. That keeps the
-`httpOnly` session cookie first-party (`SameSite=Lax`) and avoids third-party cookie blocking.
+The site and the API share one origin, so the `httpOnly` session cookie stays first-party (`SameSite=Lax`) and no
+CORS setup is needed. Every preview deployment gets its own API too, so previews never touch production code paths.
 
 Vercel's Git integration builds every push: pushes to the production branch go live, other branches get preview
 URLs. CI (`.github/workflows/ci.yml`) runs lint, tests, build and `npm audit` on the same pushes.
@@ -25,34 +26,37 @@ URLs. CI (`.github/workflows/ci.yml`) runs lint, tests, build and `npm audit` on
    which manages this for you.
 4. **Connect → Drivers** → copy the SRV string and put the database name in it:
    `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/RankIT_DB?retryWrites=true&w=majority`
+5. Optional but recommended: a second database (e.g. `RankIT_Preview`) for preview deployments, so testing a
+   branch never changes real event data.
 
-## 2. API project (`rankit-api`)
+## 2. Vercel project
 
 1. Vercel → **Add New → Project** → import the repo.
-2. **Root Directory:** `backend`. Framework preset: **Other**. Leave build and output settings empty.
-3. **Settings → Functions → Region:** the same region as the Atlas cluster.
-4. **Settings → Environment Variables** (Production and Preview):
+2. **Root Directory:** leave it as the repository root. Framework preset: **Other**. Leave build, output and
+   install settings on their defaults: `vercel.json` sets them (installs both packages, builds `frontend-react`,
+   serves `frontend-react/build`).
+3. **Settings → Functions → Region:** the same region as the Atlas cluster. Node.js version comes from the root
+   `package.json` (`22.x`).
+4. **Settings → Environment Variables:**
 
-   | Name | Value |
-   |---|---|
-   | `MONGODB_URI` | Atlas SRV string from step 1 |
-   | `JWT_SECRET` | 64+ random characters: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` |
-   | `JWT_EXPIRES_IN` | `12h` |
-   | `CORS_ORIGIN` | `https://rankit.vercel.app` (your web URL; comma-separate extra origins) |
-   | `NODE_ENV` | `production` |
+   | Name | Environments | Value |
+   |---|---|---|
+   | `MONGODB_URI` | Production | Atlas SRV string for `RankIT_DB` |
+   | `MONGODB_URI` | Preview | Atlas SRV string for the preview database (or the same one if you accept the risk) |
+   | `JWT_SECRET` | Production, Preview | 64+ random characters: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"` (use different values per environment) |
+   | `JWT_EXPIRES_IN` | Production, Preview | `12h` |
+   | `NODE_ENV` | Production, Preview | `production` |
+   | `CORS_ORIGIN` | optional | Only if another origin must call the API; the app itself is same-origin |
 
-5. Deploy. `https://rankit-api.vercel.app/api` should answer `{"message":"RankIT API is running"}`.
+5. Deploy. `https://<project>.vercel.app/api` should answer `{"message":"RankIT API is running"}` and the root
+   URL shows the public rankings page. Security headers (CSP, HSTS, `X-Frame-Options`, ...) come from
+   `vercel.json`; run `npm run build && npm run preview` in `frontend-react` to test the same headers locally.
 
-## 3. Web project (`rankit`)
+### Moving from the old two-project setup
 
-1. Import the same repo again as a second project.
-2. **Root Directory:** `frontend-react`. Framework preset: **Vite** (build `npm run build`, output `build`, both
-   already set in `frontend-react/vercel.json`).
-3. If your API project URL isn't `https://rankit-api.vercel.app`, change the first rewrite destination in
-   `frontend-react/vercel.json` and commit it. Vercel rewrites can't read environment variables.
-4. No environment variables are needed. `VITE_API_URL` defaults to `/api`.
-5. Deploy and open the site. Security headers (CSP, HSTS, `X-Frame-Options`, ...) come from `vercel.json`;
-   run `npm run build && npm run preview` locally to test the same headers.
+Older versions used two projects (`rankit-api` rooted at `backend`, `rankit` rooted at `frontend-react`). Point
+the `rankit` project's **Root Directory** back to the repository root, copy the API project's environment
+variables into it, redeploy, then delete the `rankit-api` project.
 
 ## 4. First superadmin
 
@@ -79,8 +83,7 @@ On a preview URL first, then production:
 
 ## Rollback
 
-Vercel → project → **Deployments** → pick the last good deployment → **Promote to Production**. Do it for both
-projects if the change touched the API and the web app. Database changes are not rolled back; take an
+Vercel → project → **Deployments** → pick the last good deployment → **Promote to Production**. Database changes are not rolled back; take an
 **Admin Settings → Backup** (JSON) before risky releases.
 
 ## Limits to know

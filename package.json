@@ -1,0 +1,14 @@
+{
+  "name": "rankit",
+  "version": "2.5.4",
+  "private": true,
+  "description": "RankIT: deploy root for Vercel (SPA in frontend-react, API in backend)",
+  "license": "SEE LICENSE IN LICENSE",
+  "scripts": {
+    "install:all": "npm ci --prefix frontend-react && npm ci --prefix backend",
+    "build": "npm run build --prefix frontend-react"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}
