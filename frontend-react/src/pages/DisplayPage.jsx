@@ -100,7 +100,7 @@ export default function DisplayPage() {
     <main className="display" aria-live="polite">
       <header className="display__top">
         <span className="display__brand">
-          <img src="/logo.png" alt="" width="40" height="40" />
+          <img src="/logo.svg" alt="" width="40" height="40" />
           RankIT
         </span>
         {payload?.event && (

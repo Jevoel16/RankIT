@@ -1,6 +1,6 @@
 {
   "name": "rankit",
-  "version": "2.5.4",
+  "version": "2.6.0",
   "private": true,
   "description": "RankIT: deploy root for Vercel (SPA in frontend-react, API in backend)",
   "license": "SEE LICENSE IN LICENSE",

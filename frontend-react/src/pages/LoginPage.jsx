@@ -64,7 +64,7 @@ export default function LoginPage() {
     <section className="auth">
       <div className="auth__card">
         <header className="auth__header">
-          <img src="/logo.png" alt="" width="48" height="48" />
+          <img src="/logo.svg" alt="" width="48" height="48" />
           <h1>{isRegister ? 'Request staff access' : 'Staff sign in'}</h1>
           <p className="muted">
             {isRegister

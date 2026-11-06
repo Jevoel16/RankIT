@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="frontend-react/public/logo192.png" alt="RankIT logo" width="80">
+  <img src="frontend-react/public/logo.svg" alt="RankIT logo" width="80">
   <h1>RankIT</h1>
   <p>Live, role-based tabulation and rankings for school events.</p>
 
-[![Version](https://img.shields.io/badge/version-2.5.4-blue?style=flat)](backend/package.json)
+[![Version](https://img.shields.io/badge/version-2.6.0-blue?style=flat)](backend/package.json)
 [![License](https://img.shields.io/badge/license-Sprucetrap%20Source--Available-lightgrey?style=flat)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jevoel16/RankIT/ci.yml?branch=V2.0-RankIT&label=CI&style=flat)](https://github.com/Jevoel16/RankIT/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-web-informational?style=flat)](#getting-started)
@@ -148,7 +148,7 @@ Deploying: import the repo into Vercel as one project (root directory = repo roo
 backend/          Express API: routes, controllers, models, validation, tests, seed scripts
 frontend-react/   React app: pages, components (ui kit), hooks, styles
 api/              Vercel serverless entry (loads backend/server.js)
-docs/             Deployment guide
+docs/             Deployment guide, screenshots, brand assets (logo exports for OAuth and social cards)
 .github/          CI workflow
 ```
 

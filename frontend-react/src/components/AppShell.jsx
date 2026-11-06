@@ -55,7 +55,7 @@ export default function AppShell({ children, bare = false }) {
       <header className="shell-header no-print">
         <div className="shell-header__inner">
           <Link to="/" className="shell-brand">
-            <img src="/logo.png" alt="" width="28" height="28" />
+            <img src="/logo.svg" alt="" width="28" height="28" />
             <span>RankIT</span>
           </Link>
 
