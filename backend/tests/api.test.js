@@ -144,6 +144,16 @@ describe('role guards', () => {
     expect(res.status).toBe(200);
   });
 
+  it('lets superadmin see and approve pending accounts of any role', async () => {
+    const waiting = await createUser('newgriev', 'grievance', { approved: false });
+    const root = await loginAs(app, users.superadmin);
+    const pending = await root.get('/api/users/pending');
+    expect(pending.body.map((user) => user.username)).toContain(waiting.username);
+    const res = await root.patch(`/api/users/${waiting._id}/approval`).send({ decision: 'approve' });
+    expect(res.status).toBe(200);
+    expect(res.body.approvalStatus).toBe('approved');
+  });
+
   it('requires authentication', async () => {
     const res = await request(app).get('/api/events');
     expect(res.status).toBe(401);

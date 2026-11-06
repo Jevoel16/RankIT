@@ -3,7 +3,7 @@
   <h1>RankIT</h1>
   <p>Live, role-based tabulation and rankings for school events.</p>
 
-[![Version](https://img.shields.io/badge/version-2.4.1-blue?style=flat)](backend/package.json)
+[![Version](https://img.shields.io/badge/version-2.5.0-blue?style=flat)](backend/package.json)
 [![License](https://img.shields.io/badge/license-Sprucetrap%20Source--Available-lightgrey?style=flat)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jevoel16/RankIT/ci.yml?branch=V2.0-RankIT&label=CI&style=flat)](https://github.com/Jevoel16/RankIT/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-web-informational?style=flat)](#getting-started)
@@ -23,7 +23,8 @@ RankIT runs the scoring side of school competitions: admins set up events and cr
 ## Features
 
 - Public live leaderboard by event, category and overall weighted ranking
-- Role consoles for superadmin, admin, tabulator and grievance staff
+- Big-screen display mode for projectors, with auto-rotating views and a QR code
+- Role consoles for superadmin, admin, tabulator and grievance staff, built for phones and tablets
 - Criteria-based and set-based (sports) scoring with automatic rankings
 - Auditable grievance deductions with reasons
 - Master report PDFs: main results, deduction notes, weighted rankings
@@ -38,7 +39,7 @@ RankIT runs the scoring side of school competitions: admins set up events and cr
 
 | Layer | Tools |
 |---|---|
-| Frontend | React 19.3.1, React Router 6.30.6, Vite 6.4.5, @react-pdf/renderer 4.9.0 |
+| Frontend | React 19.3.1, React Router 6.30.6, Vite 6.4.5, @react-pdf/renderer 4.9.0, qrcode 1.5.4 |
 | Backend | Node.js 22.14.0, Express 5.2.1, Mongoose 9.12.0, Zod 4.6.7, Helmet 8.3.0 |
 | Database | MongoDB (Atlas in production) |
 | Testing | Vitest 4.1.12, Supertest, mongodb-memory-server |
@@ -95,7 +96,7 @@ The API reads `backend/.env`; see [`backend/.env.example`](backend/.env.example)
 1. **Admin** creates an event with its criteria (or sets for sports), adds contestants and assigns a tabulator.
 2. **Tabulator** records each judge's scores; rankings update immediately.
 3. **Grievance** files deductions with a reason when a rule is broken.
-4. **Everyone** follows the public page at `/`; admins choose which events and ranking views are visible.
+4. **Everyone** follows the public page at `/`; admins choose which events and ranking views are visible. Put `/display` (or `/display/<eventId>`) on a projector: it rotates event, category and overall standings every 15 seconds (`?seconds=20`, `?rotate=0` to pin). Press F for full screen, Space to pause.
 5. **Admin** prints the master report when the event is finalized.
 
 Deploying: see [docs/deployment.md](docs/deployment.md).

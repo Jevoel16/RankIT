@@ -4,7 +4,6 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import App from './App';
 import { AuthProvider } from './hooks/useAuth';
 import { ThemeProvider } from './hooks/useTheme';
-import { ActiveEventProvider } from './hooks/useActiveEvent';
 
 beforeEach(() => {
   // The community page polls public endpoints; answer with "no active event".
@@ -27,9 +26,7 @@ test('renders the public community page with staff login', async () => {
     <MemoryRouter initialEntries={['/']}>
       <AuthProvider>
         <ThemeProvider>
-          <ActiveEventProvider>
-            <App />
-          </ActiveEventProvider>
+          <App />
         </ThemeProvider>
       </AuthProvider>
     </MemoryRouter>

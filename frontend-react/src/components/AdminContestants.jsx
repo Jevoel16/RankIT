@@ -1,445 +1,243 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { bulkCreateContestants, createContestant, fetchContestants, fetchEvents, updateContestant } from '../api';
-import usePagination from '../hooks/usePagination';
-import TablePager from './TablePager';
+import { useCallback, useEffect, useState } from 'react';
+import { bulkCreateContestants, createContestant, fetchContestants, updateContestant } from '../api';
+import useEvents from '../hooks/useEvents';
+import usePersistentState from '../hooks/usePersistentState';
+import { useAuth } from '../hooks/useAuth';
+import { Button, DataTable, EmptyState, FormField, useToast } from './ui';
 
-export default function AdminContestants({ token, actorKey = 'admin' }) {
-  const [contestantsSubtab, setContestantsSubtab] = useState('add');
-  const [events, setEvents] = useState([]);
-  const [eventId, setEventId] = useState('');
-  const [name, setName] = useState('');
-  const [contestantNumber, setContestantNumber] = useState('');
-  const [bulkNames, setBulkNames] = useState('');
-  const [editContestantId, setEditContestantId] = useState('');
-  const [editName, setEditName] = useState('');
-  const [editContestantNumber, setEditContestantNumber] = useState('');
+const nextNumber = (contestants) =>
+  contestants.reduce((max, item) => Math.max(max, Number(item.contestantNumber || 0)), 0) + 1;
+
+export default function AdminContestants() {
+  const toast = useToast();
+  const { user } = useAuth();
+  const { events } = useEvents({ onError: toast.error });
+  const [eventId, setEventId] = usePersistentState(`rankit_ui_contestants_event_${user?.id || 'anon'}`, '');
   const [contestants, setContestants] = useState([]);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState('single');
+  const [name, setName] = useState('');
+  const [number, setNumber] = useState('');
+  const [bulkNames, setBulkNames] = useState('');
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
 
-  const [storageReady, setStorageReady] = useState(false);
-  const preferredEventIdRef = useRef('');
-  const storageActorKey = useMemo(() => actorKey || 'admin', [actorKey]);
-  const stateStorageKey = useMemo(
-    () => `rankit_admin_contestants_state_${storageActorKey}`,
-    [storageActorKey]
-  );
-  const actionsStorageKey = useMemo(
-    () => `rankit_admin_contestants_actions_${storageActorKey}`,
-    [storageActorKey]
-  );
+  const validEventId = events.some((event) => event._id === eventId) ? eventId : '';
 
-  const recordUserAction = (actionType, value) => {
-    try {
-      const saved = localStorage.getItem(actionsStorageKey);
-      const history = saved ? JSON.parse(saved) : [];
-      history.push({
-        actionType,
-        value,
-        timestamp: new Date().toISOString()
-      });
-      localStorage.setItem(actionsStorageKey, JSON.stringify(history.slice(-300)));
-    } catch (_error) {
-      // Ignore storage failures.
-    }
-  };
-
-  useEffect(() => {
-    setStorageReady(false);
-
-    try {
-      const saved = localStorage.getItem(stateStorageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setContestantsSubtab(parsed.contestantsSubtab || 'add');
-        preferredEventIdRef.current = parsed.eventId || '';
-        setEventId(parsed.eventId || '');
+  const load = useCallback(
+    async (id) => {
+      if (!id) {
+        setContestants([]);
+        return;
       }
-    } catch (_error) {
-      // Ignore malformed storage.
-    } finally {
-      setStorageReady(true);
-    }
-  }, [stateStorageKey]);
-
-  useEffect(() => {
-    if (!storageReady) {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        stateStorageKey,
-        JSON.stringify({
-          contestantsSubtab,
-          eventId
-        })
-      );
-    } catch (_error) {
-      // Ignore storage failures.
-    }
-  }, [storageReady, stateStorageKey, contestantsSubtab, eventId]);
-
-  useEffect(() => {
-    if (!storageReady) {
-      return;
-    }
-    recordUserAction('contestants_subtab_changed', contestantsSubtab);
-  }, [storageReady, contestantsSubtab]);
-
-  useEffect(() => {
-    if (!storageReady || !eventId) {
-      return;
-    }
-    recordUserAction('contestants_event_selected', eventId);
-  }, [storageReady, eventId]);
-
-  const contestantsPagination = usePagination(contestants, 10);
-
-  const loadContestants = async (selectedEventId) => {
-    if (!selectedEventId) {
-      setContestants([]);
-      return;
-    }
-
-    const data = await fetchContestants(selectedEventId, token);
-    setContestants(data);
-  };
-
-  useEffect(() => {
-    async function init() {
       try {
-        const data = await fetchEvents(token);
-        setEvents(data);
-        const preferredEventId = preferredEventIdRef.current;
-        const resolvedEventId = (data || []).some((item) => item._id === preferredEventId)
-          ? preferredEventId
-          : '';
-        if (resolvedEventId) {
-          setEventId(resolvedEventId);
-          await loadContestants(resolvedEventId);
-        }
-      } catch (err) {
-        setError(err.message);
+        setContestants((await fetchContestants(id)) || []);
+      } catch (error) {
+        toast.error(error.message);
       }
-    }
+    },
+    [toast]
+  );
 
-    init();
-  }, []);
+  useEffect(() => {
+    load(validEventId);
+    setEditing(null);
+  }, [validEventId, load]);
 
-  const onSingleCreate = async (event) => {
-    event.preventDefault();
-    setError('');
-    setSuccess('');
-    setLoading(true);
-
+  const run = async (action, message) => {
+    setSaving(true);
     try {
-      await createContestant(
-        {
-          eventId,
+      await action();
+      toast.success(message);
+      await load(validEventId);
+      return true;
+    } catch (error) {
+      toast.error(error.message);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addSingle = async (event) => {
+    event.preventDefault();
+    const ok = await run(
+      () =>
+        createContestant({
+          eventId: validEventId,
           name: name.trim(),
-          contestantNumber: contestantNumber ? Number(contestantNumber) : undefined
-        },
-        token
-      );
-      setSuccess('Contestant created.');
-      recordUserAction('contestant_created', { eventId, name: name.trim() });
+          contestantNumber: number ? Number(number) : nextNumber(contestants)
+        }),
+      `Added ${name.trim()}.`
+    );
+    if (ok) {
       setName('');
-      setContestantNumber('');
-      await loadContestants(eventId);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      setNumber('');
     }
   };
 
-  const onBulkCreate = async (event) => {
+  const addBulk = async (event) => {
     event.preventDefault();
-    setError('');
-    setSuccess('');
-    setLoading(true);
-
-    try {
-      const nextBaseNumber = contestants.reduce((max, item) => {
-        const value = Number(item.contestantNumber || 0);
-        return value > max ? value : max;
-      }, 0);
-
-      const rows = bulkNames
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line, index) => ({
-          name: line,
-          contestantNumber: nextBaseNumber + index + 1
-        }));
-
-      await bulkCreateContestants({ eventId, contestants: rows }, token);
-      setSuccess('Bulk contestants created.');
-      recordUserAction('bulk_contestants_created', { eventId, count: rows.length });
-      setBulkNames('');
-      await loadContestants(eventId);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    const start = nextNumber(contestants);
+    const rows = bulkNames
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line, index) => ({ name: line, contestantNumber: start + index }));
+    if (rows.length === 0) return;
+    const ok = await run(
+      () => bulkCreateContestants({ eventId: validEventId, contestants: rows }),
+      `Added ${rows.length} contestants.`
+    );
+    if (ok) setBulkNames('');
   };
 
-  const onEventChange = async (value) => {
-    setEventId(value);
-    setEditContestantId('');
-    setEditName('');
-    setEditContestantNumber('');
-    setError('');
-    setSuccess('');
-    try {
-      await loadContestants(value);
-    } catch (err) {
-      setError(err.message);
-    }
+  const saveEdit = async () => {
+    const ok = await run(
+      () =>
+        updateContestant(editing.id, {
+          name: editing.name.trim(),
+          contestantNumber: editing.number === '' ? null : Number(editing.number)
+        }),
+      'Contestant updated.'
+    );
+    if (ok) setEditing(null);
   };
 
-  const onStartEdit = (contestant) => {
-    setEditContestantId(contestant._id);
-    setEditName(contestant.name || '');
-    setEditContestantNumber(contestant.contestantNumber ? String(contestant.contestantNumber) : '');
-    setError('');
-    setSuccess('');
-  };
-
-  const onCancelEdit = () => {
-    setEditContestantId('');
-    setEditName('');
-    setEditContestantNumber('');
-  };
-
-  const onUpdateContestant = async (contestantId) => {
-    setError('');
-    setSuccess('');
-    setLoading(true);
-
-    try {
-      await updateContestant(
-        contestantId,
-        {
-          name: editName.trim(),
-          contestantNumber: editContestantNumber === '' ? null : Number(editContestantNumber)
-        },
-        token
-      );
-
-      setSuccess('Contestant updated.');
-      recordUserAction('contestant_updated', { eventId, contestantId });
-      onCancelEdit();
-      await loadContestants(eventId);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const isEditing = (row) => editing?.id === row._id;
 
   return (
-    <div className="panel stack">
-      <div className="sub-tabs contestant-sub-subtabs" role="tablist" aria-label="Contestant Actions">
-            <button
-              type="button"
-              className={`subtab-btn ${contestantsSubtab === 'add' ? 'active' : ''}`}
-              onClick={() => setContestantsSubtab('add')}
-            >
-              Add Contestants
-            </button>
-            <button
-              type="button"
-              className={`subtab-btn ${contestantsSubtab === 'update' ? 'active' : ''}`}
-              onClick={() => setContestantsSubtab('update')}
-            >
-              Update Contestants
-            </button>
-          
-          </div>
-        <div className="contestants-subtab-bubble stack">
-    
-        <label htmlFor="contestant-event">Event</label>
-        <select id="contestant-event" value={eventId} onChange={(e) => onEventChange(e.target.value)}>
-          <option value="">Select event</option>
+    <div className="form-stack">
+      <FormField label="Event">
+        <select value={validEventId} onChange={(e) => setEventId(e.target.value)}>
+          <option value="">Select an event</option>
           {events.map((event) => (
             <option key={event._id} value={event._id}>
               {event.name}
             </option>
           ))}
         </select>
-        
-          {contestantsSubtab === 'add' && (
-            <>
-              <div className="split-form">
-                <form className="stack" onSubmit={onSingleCreate}>
-                  <strong>Add Single Contestant</strong>
-                  <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Contestant name"
-                    required
-                    disabled={!eventId}
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    value={contestantNumber}
-                    onChange={(e) => setContestantNumber(e.target.value)}
-                    placeholder="Contestant number (optional)"
-                    disabled={!eventId}
-                  />
-                  <button type="submit" disabled={loading || !eventId}>Create Contestant</button>
-                </form>
+      </FormField>
 
-                <form className="stack" onSubmit={onBulkCreate}>
-                  <strong>Bulk Add Contestants</strong>
+      {!validEventId ? (
+        <EmptyState title="Choose an event">Pick an event to add or edit its contestants.</EmptyState>
+      ) : (
+        <>
+          <div className="card-block">
+            <div className="segmented" role="group" aria-label="Add contestants">
+              <button type="button" aria-pressed={mode === 'single'} onClick={() => setMode('single')}>
+                One at a time
+              </button>
+              <button type="button" aria-pressed={mode === 'bulk'} onClick={() => setMode('bulk')}>
+                Paste a list
+              </button>
+            </div>
+
+            {mode === 'single' ? (
+              <form className="inline-form" onSubmit={addSingle}>
+                <FormField label="Name" required>
+                  <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
+                </FormField>
+                <FormField label="Number" hint={`Next free: ${nextNumber(contestants)}`}>
+                  <input type="number" min={1} value={number} onChange={(e) => setNumber(e.target.value)} />
+                </FormField>
+                <Button type="submit" variant="primary" loading={saving} disabled={!name.trim()}>
+                  Add
+                </Button>
+              </form>
+            ) : (
+              <form className="form-stack" onSubmit={addBulk}>
+                <FormField label="Names" hint="One per line. Numbers continue from the highest existing one.">
                   <textarea
-                    className="bulk-area"
+                    rows={6}
                     value={bulkNames}
                     onChange={(e) => setBulkNames(e.target.value)}
-                    placeholder={"One name per line\nAlice\nBea\nCara"}
-                    required
-                    disabled={!eventId}
+                    placeholder={'Alice\nBea\nCara'}
                   />
-                  <button type="submit" disabled={loading || !eventId}>Bulk Create</button>
-                </form>
-              </div>
+                </FormField>
+                <div>
+                  <Button type="submit" variant="primary" loading={saving} disabled={!bulkNames.trim()}>
+                    Add all
+                  </Button>
+                </div>
+              </form>
+            )}
+          </div>
 
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Name</th>
-                      <th>ID</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contestants.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="muted">
-                          {eventId ? 'No contestants for this event yet.' : 'Select an event to view contestants.'}
-                        </td>
-                      </tr>
-                    )}
-                    {contestantsPagination.paginatedItems.map((item) => (
-                      <tr key={item._id}>
-                        <td>{item.contestantNumber || '-'}</td>
-                        <td>{item.name}</td>
-                        <td>{item._id}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
-          {contestantsSubtab === 'update' && (
-            <>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Name</th>
-                      <th>ID</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contestants.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="muted">
-                          {eventId ? 'No contestants for this event yet.' : 'Select an event to view contestants.'}
-                        </td>
-                      </tr>
-                    )}
-                    {contestantsPagination.paginatedItems.map((item) => {
-                      const isEditing = editContestantId === item._id;
-
-                      return (
-                        <tr key={item._id}>
-                          <td>
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                min={1}
-                                value={editContestantNumber}
-                                onChange={(e) => setEditContestantNumber(e.target.value)}
-                                placeholder="No."
-                                disabled={loading}
-                              />
-                            ) : (
-                              item.contestantNumber || '-'
-                            )}
-                          </td>
-                          <td>
-                            {isEditing ? (
-                              <input
-                                value={editName}
-                                onChange={(e) => setEditName(e.target.value)}
-                                placeholder="Contestant name"
-                                disabled={loading}
-                              />
-                            ) : (
-                              item.name
-                            )}
-                          </td>
-                          <td>{item._id}</td>
-                          <td className="action-cell">
-                            {isEditing ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className="ghost-btn"
-                                  onClick={() => onUpdateContestant(item._id)}
-                                  disabled={loading || !editName.trim()}
-                                >
-                                  Save
-                                </button>
-                                <button type="button" className="ghost-btn" onClick={onCancelEdit} disabled={loading}>
-                                  Cancel
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                type="button"
-                                className="ghost-btn"
-                                onClick={() => onStartEdit(item)}
-                                disabled={!eventId || loading}
-                              >
-                                Edit
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-
-          <TablePager
-            page={contestantsPagination.page}
-            totalPages={contestantsPagination.totalPages}
-            totalItems={contestantsPagination.totalItems}
-            canPrev={contestantsPagination.canPrev}
-            canNext={contestantsPagination.canNext}
-            onPrev={contestantsPagination.goPrev}
-            onNext={contestantsPagination.goNext}
+          <DataTable
+            caption="Contestants"
+            rows={[...contestants].sort((a, b) => Number(a.contestantNumber || 0) - Number(b.contestantNumber || 0))}
+            pageSize={15}
+            emptyTitle="No contestants yet"
+            emptyMessage="Add the first one above."
+            columns={[
+              {
+                key: 'number',
+                header: 'No.',
+                render: (row) =>
+                  isEditing(row) ? (
+                    <input
+                      aria-label="Contestant number"
+                      className="input-narrow"
+                      type="number"
+                      min={1}
+                      value={editing.number}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, number: e.target.value }))}
+                    />
+                  ) : (
+                    row.contestantNumber || '-'
+                  )
+              },
+              {
+                key: 'name',
+                header: 'Name',
+                render: (row) =>
+                  isEditing(row) ? (
+                    <input
+                      aria-label="Contestant name"
+                      value={editing.name}
+                      onChange={(e) => setEditing((prev) => ({ ...prev, name: e.target.value }))}
+                    />
+                  ) : (
+                    <strong>{row.name}</strong>
+                  )
+              },
+              {
+                key: 'actions',
+                header: 'Actions',
+                align: 'right',
+                render: (row) =>
+                  isEditing(row) ? (
+                    <span className="button-row">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        loading={saving}
+                        disabled={!editing.name.trim()}
+                        onClick={saveEdit}
+                      >
+                        Save
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                        Cancel
+                      </Button>
+                    </span>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={Boolean(editing)}
+                      onClick={() =>
+                        setEditing({ id: row._id, name: row.name || '', number: String(row.contestantNumber ?? '') })
+                      }
+                    >
+                      Edit
+                    </Button>
+                  )
+              }
+            ]}
           />
-      </div>
-
-      {error && <p className="error">{error}</p>}
-      {success && <p className="success">{success}</p>}
+        </>
+      )}
     </div>
   );
 }

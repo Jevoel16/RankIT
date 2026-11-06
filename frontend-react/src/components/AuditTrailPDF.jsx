@@ -81,7 +81,8 @@ export default function AuditTrailPDF({ logs = [], summary = {}, generatedAt = n
               <Text style={styles.title}>Filtered Audit Trail</Text>
               <Text style={styles.metaLine}>Generated: {generatedLabel}</Text>
               <Text style={styles.metaLine}>
-                Filters: From: {summary.from || 'Any'} | To: {summary.to || 'Any'} | User: {summary.user || 'Any'} | Action: {summary.action || 'Any'}
+                Filters: From: {summary.from || 'Any'} | To: {summary.to || 'Any'} | User: {summary.user || 'Any'} |
+                Action: {summary.action || 'Any'}
               </Text>
               <Text style={styles.metaLine}>Total Records: {logs.length}</Text>
             </>

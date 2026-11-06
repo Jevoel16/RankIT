@@ -1,98 +1,44 @@
-/* Print layout for reports and rankings: always black on white. */
+/* Printing the page itself (reports have their own PDFs): black on white, no app chrome. */
 @media print {
-  @page {
-    margin: 12mm;
-  }
-
-  html,
-  body,
-  .app-shell,
-  .content-shell,
-  .admin-workspace,
-  .tab-content-shell {
-    height: auto !important;
-    min-height: 0 !important;
-    overflow: visible !important;
+  :root {
+    color-scheme: light;
   }
 
   body {
-    margin: 0;
-    background: #ffffff;
-    color: #111111;
+    background: #fff !important;
+    color: #000;
   }
 
-  .navbar,
+  .shell-header,
+  .shell-drawer,
+  .app-footer,
+  .console__nav,
+  .console__toolbar,
+  .ui-toasts,
+  .ui-pager,
   .no-print,
-  .admin-tabs,
-  .sub-tabs {
+  button {
     display: none !important;
   }
 
-  .app-shell,
-  .content-shell,
-  .panel {
-    width: 100%;
-    margin: 0;
+  .content-shell {
+    max-width: none;
     padding: 0;
-    border: 0;
+  }
+
+  .panel,
+  .card-block,
+  .rank-list__row,
+  .event-card {
+    background: #fff !important;
+    color: #000;
+    border-color: #ccc;
     box-shadow: none;
-    background: #ffffff;
   }
 
-  /* Print only the intended report section to prevent trailing blank pages. */
-  body[data-print-target='tabulator'] .panel > * {
-    display: none !important;
-  }
-
-  body[data-print-target='tabulator'] .print-target-tabulator {
-    display: block !important;
-    margin: 0;
-    padding: 0;
-    background: #ffffff;
-    break-inside: auto;
-    break-after: auto;
-    page-break-after: auto;
-  }
-
-  .print-only {
-    display: block !important;
-  }
-
-  .print-report {
-    margin: 0;
-    padding: 0;
-    position: static;
-    width: 100%;
-    background: #ffffff;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-    page-break-inside: auto;
-  }
-
-  th,
-  td {
-    border: 1px solid #cfcfcf;
-    color: #111111;
-    background: #ffffff;
-    padding: 6px 8px;
-    page-break-inside: avoid;
-  }
-
-  td {
-    text-align: center;
-  }
-
-  th {
-    text-align: center;
+  .ui-table th {
     position: static;
     background: #f3f3f3;
-  }
-
-  tr {
-    page-break-inside: avoid;
+    color: #000;
   }
 }

@@ -1,6 +1,6 @@
 import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
-import { useAuth } from '../hooks/useAuth';
 import { logPdfDownload } from '../api';
+import { Modal } from './ui';
 
 export default function PrintReportPreviewModal({
   open,
@@ -9,48 +9,47 @@ export default function PrintReportPreviewModal({
   onClose,
   fileName,
   pdfDocument,
-  downloadLabel,
-  reportType,
+  downloadLabel = 'Download PDF',
+  reportType = 'report',
   eventId,
   onDownloadLogged
 }) {
-  const { token } = useAuth();
+  if (!pdfDocument) return null;
 
-  const handleDownloadClick = async () => {
-    try {
-      await logPdfDownload(reportType || 'report', eventId, token);
-      if (typeof onDownloadLogged === 'function') {
-        onDownloadLogged();
-      }
-    } catch (err) {
-      console.error('Failed to log PDF download:', err);
-    }
-  };
-  if (!open || !pdfDocument) {
-    return null;
-  }
+  // Download logging is best-effort and must not block the file.
+  const logDownload = () =>
+    logPdfDownload(reportType, eventId)
+      .then(() => onDownloadLogged?.())
+      .catch(() => {});
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
-      <div className="modal-card pdf-preview-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-        <div className="section-head">
-          <h3>{title}</h3>
-          <span className="muted">{subtitle}</span>
-        </div>
-
-        <div className="pdf-preview-viewer-wrap">
-          <PDFViewer className="pdf-preview-viewer" showToolbar>
-            {pdfDocument}
-          </PDFViewer>
-        </div>
-
-        <div className="action-cell">
-          <PDFDownloadLink document={pdfDocument} fileName={fileName} className="ghost-btn pdf-link-btn" onClick={handleDownloadClick}>
-            {({ loading }) => (loading ? 'Preparing PDF...' : downloadLabel || 'Download PDF')}
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="full"
+      title={title}
+      description={subtitle}
+      footer={
+        <>
+          <PDFDownloadLink
+            document={pdfDocument}
+            fileName={fileName}
+            className="ui-btn ui-btn--primary"
+            onClick={logDownload}
+          >
+            {({ loading }) => (loading ? 'Preparing PDF…' : downloadLabel)}
           </PDFDownloadLink>
-          <button type="button" onClick={onClose}>Close Preview</button>
-        </div>
+          <button type="button" className="ui-btn ui-btn--secondary" onClick={onClose}>
+            Close
+          </button>
+        </>
+      }
+    >
+      <div className="pdf-frame">
+        <PDFViewer className="pdf-viewer" showToolbar>
+          {pdfDocument}
+        </PDFViewer>
       </div>
-    </div>
+    </Modal>
   );
 }

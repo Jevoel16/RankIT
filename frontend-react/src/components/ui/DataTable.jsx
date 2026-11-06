@@ -1,5 +1,5 @@
 import usePagination from '../../hooks/usePagination';
-import TablePager from '../TablePager';
+import Pager from './Pager';
 import EmptyState from './EmptyState';
 
 const cellClass = (column) =>
@@ -54,7 +54,7 @@ export default function DataTable({
         </tbody>
       </table>
       {pager.totalPages > 1 && (
-        <TablePager
+        <Pager
           page={pager.page}
           totalPages={pager.totalPages}
           totalItems={pager.totalItems}

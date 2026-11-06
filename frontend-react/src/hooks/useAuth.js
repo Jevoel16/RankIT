@@ -1,11 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  UNAUTHORIZED_EVENT,
-  fetchCurrentUser,
-  login as loginRequest,
-  logout as logoutRequest
-} from '../api';
+import { UNAUTHORIZED_EVENT, fetchCurrentUser, login as loginRequest, logout as logoutRequest } from '../api';
 
 const AuthContext = createContext(null);
 // Only the non-secret profile is cached so the UI can render instantly; the session itself
@@ -41,6 +36,10 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  // The cached profile may be stale (signed out elsewhere, or another account signed in);
+  // protected routes wait for this check before trusting it.
+  const [sessionChecked, setSessionChecked] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     fetchCurrentUser()
@@ -51,6 +50,9 @@ export function AuthProvider({ children }) {
       })
       .catch(() => {
         if (!cancelled) clearSession();
+      })
+      .finally(() => {
+        if (!cancelled) setSessionChecked(true);
       });
     return () => {
       cancelled = true;
@@ -85,13 +87,12 @@ export function AuthProvider({ children }) {
   const value = useMemo(
     () => ({
       user,
-      // Kept for callers that still pass it; the cookie carries the session now.
-      token: null,
       isAuthenticated: Boolean(user),
+      sessionChecked,
       login,
       logout
     }),
-    [user, login, logout]
+    [user, sessionChecked, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

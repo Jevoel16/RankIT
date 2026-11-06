@@ -72,7 +72,12 @@ function chunkRows(rows) {
   return chunks.length ? chunks : [[]];
 }
 
-export default function UsersDirectoryPDF({ title = 'Users Directory', users = [], summary = {}, generatedAt = new Date() }) {
+export default function UsersDirectoryPDF({
+  title = 'Users Directory',
+  users = [],
+  summary = {},
+  generatedAt = new Date()
+}) {
   const pages = chunkRows(users);
   const generatedLabel = new Date(generatedAt).toLocaleString();
 

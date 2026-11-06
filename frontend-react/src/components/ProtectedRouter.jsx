@@ -1,19 +1,23 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { normalizeRole } from '../utils/roles';
+import { Skeleton } from './ui';
 
 export default function ProtectedRouter({ roles, children }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, sessionChecked, user } = useAuth();
   const location = useLocation();
 
-  if (!isAuthenticated) {
+  // Don't route on a cached profile until the server confirms the session.
+  if (!sessionChecked) {
     return (
-      <Navigate
-        to="/login"
-        replace
-        state={{ from: `${location.pathname}${location.search}${location.hash}` }}
-      />
+      <div aria-busy="true" aria-label="Checking your session">
+        <Skeleton lines={6} height={20} />
+      </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}${location.hash}` }} />;
   }
 
   const allowed = (roles || []).map(normalizeRole);

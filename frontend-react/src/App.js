@@ -1,26 +1,35 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import './styles/tokens.css';
-import './App.css';
+import './styles/base.css';
 import './styles/ui.css';
-import './styles/responsive.css';
+import './styles/pages.css';
 import './styles/print.css';
 import AppShell from './components/AppShell.jsx';
 import ProtectedRouter from './components/ProtectedRouter.jsx';
 import { useAuth } from './hooks/useAuth';
 import { homePathForRole } from './utils/roles';
 import LoginPage from './pages/LoginPage.jsx';
-import TabulatorPage from './pages/TabulatorPage.jsx';
-import AdminPage from './pages/AdminPage.jsx';
-import SuperadminPage from './pages/SuperadminPage.jsx';
+import TabulatorPage from './pages/tabulator/TabulatorPage.jsx';
+import AdminPage from './pages/admin/AdminPage.jsx';
+import SuperadminPage from './pages/superadmin/SuperadminPage.jsx';
 import CommunityHome from './pages/CommunityHome.jsx';
-import GrievancePage from './pages/GrievancePage.jsx';
+import GrievancePage from './pages/grievance/GrievancePage.jsx';
+import DisplayPage from './pages/DisplayPage.jsx';
 
 function App() {
   const { isAuthenticated, user } = useAuth();
 
   return (
-    <AppShell>
-      <Routes>
+    <Routes>
+      {/* Projector view runs without the app chrome. */}
+      <Route path="/display/:eventId?" element={<DisplayPage />} />
+      <Route
+        element={
+          <AppShell>
+            <Outlet />
+          </AppShell>
+        }
+      >
         <Route path="/" element={<CommunityHome />} />
         <Route path="/login" element={<LoginPage />} />
         <Route
@@ -65,12 +74,9 @@ function App() {
             </ProtectedRouter>
           }
         />
-        <Route
-          path="*"
-          element={<Navigate to={isAuthenticated ? homePathForRole(user?.role) : '/'} replace />}
-        />
-      </Routes>
-    </AppShell>
+        <Route path="*" element={<Navigate to={isAuthenticated ? homePathForRole(user?.role) : '/'} replace />} />
+      </Route>
+    </Routes>
   );
 }
 

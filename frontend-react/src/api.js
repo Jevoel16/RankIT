@@ -191,7 +191,7 @@ export function fetchEventScores(eventId) {
 
 export function generateSportsTop4Pairings(eventId) {
   return request(`/scores/sports/${encodeURIComponent(eventId)}/top4-pairings`, {
-    method: 'POST',
+    method: 'POST'
   });
 }
 

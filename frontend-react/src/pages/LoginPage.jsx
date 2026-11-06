@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
 import { register as registerRequest } from '../api';
+import { Button, FormField, TabPanel, Tabs } from '../components/ui';
+import { useAuth } from '../hooks/useAuth';
+import { homePathForRole } from '../utils/roles';
+
+const TABS_ID = 'auth-mode';
 
 export default function LoginPage() {
   const { login, isAuthenticated, user } = useAuth();
@@ -16,96 +19,16 @@ export default function LoginPage() {
   const [error, setError] = useState(location.state?.notice || '');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [storageReady, setStorageReady] = useState(false);
-
-  const stateStorageKey = 'rankit_login_state';
-  const actionsStorageKey = 'rankit_login_actions';
-
-  const recordUserAction = (actionType, value) => {
-    try {
-      const saved = localStorage.getItem(actionsStorageKey);
-      const history = saved ? JSON.parse(saved) : [];
-      history.push({
-        actionType,
-        value,
-        timestamp: new Date().toISOString()
-      });
-      localStorage.setItem(actionsStorageKey, JSON.stringify(history.slice(-200)));
-    } catch (_error) {
-      // Ignore storage failures.
-    }
-  };
-
-  useEffect(() => {
-    document.body.classList.add('auth-page-lock');
-    return () => {
-      document.body.classList.remove('auth-page-lock');
-    };
-  }, []);
-
-  useEffect(() => {
-    setStorageReady(false);
-
-    try {
-      const saved = localStorage.getItem(stateStorageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setMode(parsed.mode === 'register' ? 'register' : 'login');
-        setUsername(parsed.username || '');
-        setRole(parsed.role === 'grievance' ? 'grievance' : 'tabulator');
-      }
-    } catch (_error) {
-      // Ignore malformed storage.
-    } finally {
-      setStorageReady(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!storageReady) {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        stateStorageKey,
-        JSON.stringify({
-          mode,
-          username,
-          role
-        })
-      );
-    } catch (_error) {
-      // Ignore storage failures.
-    }
-  }, [storageReady, mode, username, role]);
-
-  useEffect(() => {
-    if (!storageReady) {
-      return;
-    }
-    recordUserAction('auth_mode_changed', mode);
-  }, [storageReady, mode]);
-
-  useEffect(() => {
-    if (!storageReady || mode !== 'register') {
-      return;
-    }
-    recordUserAction('register_role_selected', role);
-  }, [storageReady, mode, role]);
 
   if (isAuthenticated) {
-    const normalizedRole = user?.role === 'tallier' ? 'tabulator' : user?.role;
-    const to =
-      normalizedRole === 'tabulator'
-        ? '/tabulator'
-        : normalizedRole === 'grievance'
-          ? '/grievance'
-          : normalizedRole === 'superadmin'
-            ? '/superadmin'
-            : '/admin';
-    return <Navigate to={to} replace />;
+    return <Navigate to={homePathForRole(user?.role)} replace />;
   }
+
+  const switchMode = (next) => {
+    setMode(next);
+    setError('');
+    setSuccess('');
+  };
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -115,34 +38,18 @@ export default function LoginPage() {
 
     try {
       if (mode === 'register') {
-        if (password !== confirmPassword) {
-          throw new Error('Passwords do not match.');
-        }
-
-        const payload = await registerRequest({ username, password, role });
-        setSuccess(payload?.message || 'Registration submitted. Pending Admin Approval.');
-        recordUserAction('register_submitted', { username: String(username || '').trim(), role });
+        if (password !== confirmPassword) throw new Error('Passwords do not match.');
+        const payload = await registerRequest({ username: username.trim(), password, role });
+        setSuccess(payload?.message || 'Registration submitted. An admin will approve your account.');
         setMode('login');
+        setUsername(payload?.user?.username || '');
         setPassword('');
         setConfirmPassword('');
       } else {
-        recordUserAction('login_submitted', { username: String(username || '').trim() });
-        const payload = await login(username, password);
-        const from = location.state?.from || '';
-        const normalizedRole = payload.user.role === 'tallier' ? 'tabulator' : payload.user.role;
-        const rolePath =
-          normalizedRole === 'tabulator'
-            ? '/tabulator'
-            : normalizedRole === 'grievance'
-              ? '/grievance'
-              : normalizedRole === 'superadmin'
-                ? '/superadmin'
-                : '/admin';
-
-        const canUseFrom =
-          normalizedRole === 'tabulator' && from.startsWith('/tabulate/');
-
-        navigate(canUseFrom ? from : rolePath, { replace: true });
+        const payload = await login(username.trim(), password);
+        // Return to the page that sent the user here; the route guard re-checks the role.
+        const from = location.state?.from;
+        navigate(from && from !== '/login' ? from : homePathForRole(payload.user.role), { replace: true });
       }
     } catch (err) {
       setError(err.message);
@@ -151,90 +58,94 @@ export default function LoginPage() {
     }
   };
 
-  return (
-    <main className="auth-shell">
-      <Link to="/" className="community-brand auth-brand-link" aria-label="Go to community rankings">
-        <img src="/logo.ico" alt="" className="brand-logo-icon" aria-hidden="true" />
-        <span>RankIT</span>
-      </Link>
-      <div className="auth-panel-stack">
-        <div className="sub-tabs" role="tablist" aria-label="Authentication Mode">
-          <button
-            type="button"
-            className={`subtab-btn ${mode === 'login' ? 'active' : ''}`}
-            onClick={() => {
-              setMode('login');
-              setError('');
-              setSuccess('');
-            }}
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            className={`subtab-btn ${mode === 'register' ? 'active' : ''}`}
-            onClick={() => {
-              setMode('register');
-              setError('');
-              setSuccess('');
-            }}
-          >
-            Register
-          </button>
-        </div>
-        <form className="auth-card" onSubmit={onSubmit}>
-        <label htmlFor="username">Username</label>
-        <input
-          id="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-          autoComplete="username"
-          placeholder={mode === 'register' ? 'your_name (will be username@role.rankit)' : 'username@role.rankit'}
-        />
-        {mode === 'login' && (
-          <small className="auth-input-hint">
-            Format: username@role.rankit (e.g., john@tabulator.rankit)
-          </small>
-        )}
-        <label htmlFor="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-        />
-        {mode === 'register' && (
-          <>
-            <label htmlFor="confirm-password">Confirm Password</label>
-            <input
-              id="confirm-password"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              autoComplete="new-password"
-            />
+  const isRegister = mode === 'register';
 
-            <label htmlFor="register-role">Role</label>
-            <select id="register-role" value={role} onChange={(e) => setRole(e.target.value)}>
-              <option value="tabulator">Tabulator</option>
-              <option value="grievance">Grievance</option>
-            </select>
-            <small className="auth-input-hint auth-input-hint-tight">
-              Your username will be formatted as: <strong>your_name@{role}.rankit</strong>
-            </small>
-          </>
-        )}
-        {error && <p className="error">{error}</p>}
-        {success && <p className="success">{success}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? (mode === 'register' ? 'Submitting...' : 'Signing in...') : mode === 'register' ? 'Register' : 'Login'}
-        </button>
-        </form>
+  return (
+    <section className="auth">
+      <div className="auth__card">
+        <header className="auth__header">
+          <img src="/logo.png" alt="" width="48" height="48" />
+          <h1>{isRegister ? 'Request staff access' : 'Staff sign in'}</h1>
+          <p className="muted">
+            {isRegister
+              ? 'Tabulators and grievance officers can request an account.'
+              : 'For event admins, tabulators and grievance officers.'}
+          </p>
+        </header>
+
+        <Tabs
+          baseId={TABS_ID}
+          label="Sign in or register"
+          tabs={[
+            { id: 'login', label: 'Sign in' },
+            { id: 'register', label: 'Register' }
+          ]}
+          value={mode}
+          onChange={switchMode}
+          className="auth__tabs"
+        />
+
+        <TabPanel baseId={TABS_ID} id={mode} active>
+          <form className="form-stack" onSubmit={onSubmit} noValidate={false}>
+            <FormField
+              label="Username"
+              hint={isRegister ? `You will sign in as name@${role}.rankit` : 'For example: maria@tabulator.rankit'}
+              required
+            >
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={100}
+              />
+            </FormField>
+            <FormField label="Password" hint={isRegister ? 'At least 8 characters.' : undefined} required>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={isRegister ? 'new-password' : 'current-password'}
+                minLength={isRegister ? 8 : undefined}
+              />
+            </FormField>
+            {isRegister && (
+              <>
+                <FormField label="Confirm password" required>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </FormField>
+                <FormField label="Role">
+                  <select value={role} onChange={(e) => setRole(e.target.value)}>
+                    <option value="tabulator">Tabulator</option>
+                    <option value="grievance">Grievance</option>
+                  </select>
+                </FormField>
+              </>
+            )}
+
+            {error && (
+              <p className="form-message form-message--error" role="alert">
+                {error}
+              </p>
+            )}
+            {success && (
+              <p className="form-message form-message--success" role="status">
+                {success}
+              </p>
+            )}
+
+            <Button type="submit" variant="primary" size="lg" block loading={loading}>
+              {isRegister ? 'Request access' : 'Sign in'}
+            </Button>
+          </form>
+        </TabPanel>
       </div>
-    </main>
+    </section>
   );
 }
