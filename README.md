@@ -3,7 +3,7 @@
   <h1>RankIT</h1>
   <p>Live, role-based tabulation and rankings for school events.</p>
 
-[![Version](https://img.shields.io/badge/version-2.5.2-blue?style=flat)](backend/package.json)
+[![Version](https://img.shields.io/badge/version-2.5.3-blue?style=flat)](backend/package.json)
 [![License](https://img.shields.io/badge/license-Sprucetrap%20Source--Available-lightgrey?style=flat)](LICENSE)
 [![CI](https://img.shields.io/github/actions/workflow/status/Jevoel16/RankIT/ci.yml?branch=V2.0-RankIT&label=CI&style=flat)](https://github.com/Jevoel16/RankIT/actions/workflows/ci.yml)
 [![Platform](https://img.shields.io/badge/platform-web-informational?style=flat)](#getting-started)
@@ -15,6 +15,40 @@
 ## About
 
 RankIT runs the scoring side of school competitions: admins set up events and criteria, tabulators record judges' scores, grievance officers file deductions, and everyone else watches live rankings on a public page. It replaces spreadsheets passed between judges with one auditable system that computes event, category and overall weighted rankings and prints the official reports.
+
+[Back to top](#rankit)
+
+---
+
+## Screenshots
+
+<details>
+<summary><b>Screenshots</b></summary>
+
+<table>
+  <tr>
+    <td width="50%" align="center"><b>Live rankings</b><br><a href="docs/images/community.png"><img src="docs/images/community.png" width="100%" alt="Public leaderboard with event list, podium and ranked list"></a></td>
+    <td width="50%" align="center"><b>Display mode</b><br><a href="docs/images/display-mode.png"><img src="docs/images/display-mode.png" width="100%" alt="Full-screen projector view with podium, places 4 to 7 and a QR code"></a></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><b>Tabulator scoring</b><br><a href="docs/images/tabulator-scoring.png"><img src="docs/images/tabulator-scoring.png" width="100%" alt="Score sheet with contestant, judge and per-criterion inputs"></a></td>
+    <td width="50%" align="center"><b>Event setup</b><br><a href="docs/images/admin-create-event.png"><img src="docs/images/admin-create-event.png" width="100%" alt="Admin console creating an event with weighted criteria"></a></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><b>Master report</b><br><a href="docs/images/master-report.png"><img src="docs/images/master-report.png" width="100%" alt="Master results PDF preview with report tabs"></a></td>
+    <td width="50%" align="center"><b>Grievance deductions</b><br><a href="docs/images/grievance-deductions.png"><img src="docs/images/grievance-deductions.png" width="100%" alt="Standings table with raw average, deductions and final score"></a></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><b>Superadmin analytics</b><br><a href="docs/images/superadmin-analytics.png"><img src="docs/images/superadmin-analytics.png" width="100%" alt="Platform totals and users-by-role donut chart"></a></td>
+    <td width="50%" align="center"><b>Light theme</b><br><a href="docs/images/community-light.png"><img src="docs/images/community-light.png" width="100%" alt="Public leaderboard in the light theme"></a></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><b>Phone (tabulator)</b><br><a href="docs/images/phone-tabulator.png"><img src="docs/images/phone-tabulator.png" width="100%" alt="Tabulator scoring on a phone with a pinned record button"></a></td>
+    <td width="50%" align="center"><b>Phone (live rankings, light)</b><br><a href="docs/images/phone-community-light.png"><img src="docs/images/phone-community-light.png" width="100%" alt="Public leaderboard on a phone in the light theme"></a></td>
+  </tr>
+</table>
+
+</details>
 
 [Back to top](#rankit)
 
